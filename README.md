@@ -64,7 +64,7 @@ bash bin/install-rpgmock.sh -l RPGMOCK -t       # also runs MOCKTEST + MOCKDEMO
 pwsh -ExecutionPolicy Bypass -File bin/install-rpgmock.ps1 -Library RPGMOCK -Tests
 ```
 
-RPGMOCK is laid out like an IBM i library. Each folder in `rpgmock/` is a
+RPGMOCK is laid out like an IBM i library. Each folder in this repository is a
 source physical file, and the script copies it into the file of the same name
 in the target library:
 
@@ -233,7 +233,7 @@ dcl-proc test_orderTotal_addsTax export;
 end-proc;
 ```
 
-`rpgmock/QRPGLESRC/DEMOCUT_T.rpgle` is a complete working example. It uses a small
+`QRPGLESRC/DEMOCUT_T.rpgle` is a complete working example. It uses a small
 built-in harness instead of RPGUnit.
 
 ## Debugging
