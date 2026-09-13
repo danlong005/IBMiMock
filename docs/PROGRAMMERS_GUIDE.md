@@ -7,7 +7,7 @@ RPGMOCK gives your CL test driver commands that put stand-in objects in QTEMP. T
 | Commands and engine | `MOCK*` commands, service program `MOCKENG` |
 | Copybook for RPG tests | `MOCK_H` |
 | Requires | IBM i 7.4 or later |
-| Command reference | [`rpgmock/README.md`](../README.md) |
+| Command reference | [`README.md`](../README.md) |
 
 ## Contents
 
@@ -466,4 +466,4 @@ select * from qtemp.mock_sig;                          -- declared layouts
 
 ---
 
-RPGMOCK's source lives in `rpgmock/` in the repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Install or refresh a library with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, which also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
+RPGMOCK's source lives in the IBMiMock repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Install or refresh a library with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, which also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
