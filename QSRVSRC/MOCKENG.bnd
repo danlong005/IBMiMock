@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MOCKENGB - binder source for service program MOCKENG (RPGMOCK)   */
+/* MOCKENG - binder source for service program MOCKENG (RPGMOCK)    */
 /* Append new exports at the end; never reorder or remove.          */
 /* ---------------------------------------------------------------- */
 STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('RPGMOCK V1')

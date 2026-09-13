@@ -5,14 +5,16 @@
 /* code under test and its tests, run them, verify from CL, clean   */
 /* up. Everything runs in one job because QTEMP belongs to the job. */
 /*                                                                  */
-/*   CALL MOCKDEMO PARM('MYLIB' 'QRPGLESRC')                        */
-/*   (defaults: current library, QRPGLESRC)                         */
+/*   CALL MOCKDEMO PARM('RPGMOCK' 'SRCLIB')                         */
+/*   1: RPGMOCK library, also used for the demo objects             */
+/*      (default: current library)                                  */
+/*   2: library holding the source files (default: parameter 1)     */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&PLIB &PSRCF)
+             PGM        PARM(&PLIB &PSRCLIB)
              DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&REPORT) TYPE(*CHAR) LEN(8000)
              DCL        VAR(&FAILS) TYPE(*INT) LEN(4)
              DCL        VAR(&PROBS) TYPE(*INT) LEN(4)
@@ -34,27 +36,27 @@
              RTVJOBA    CURLIB(&LIB)
              CHGVAR     VAR(&LIB) VALUE(&PLIB)
              MONMSG     MSGID(MCH3601)
-             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
-             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             CHGVAR     VAR(&SRCLIB) VALUE(&LIB)
+             CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
              MONMSG     MSGID(MCH3601)
 
 /* Test copybooks are included from QTEMP/MOCKINC */
              DLTF       FILE(QTEMP/MOCKINC)
              MONMSG     MSGID(CPF2105)
              CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
-             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
                           FROMMBR(MOCK_H)
-             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
                           FROMMBR(MOCKTST_H)
 
 /* 1. The real dependencies (in a real project they already exist) */
-             CRTBNDRPG  PGM(&LIB/DEMODEP) SRCFILE(&LIB/&SRCF) +
+             CRTBNDRPG  PGM(&LIB/DEMODEP) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(DEMODEP) OUTPUT(*NONE)
-             CRTRPGMOD  MODULE(QTEMP/DEMOSRV) SRCFILE(&LIB/&SRCF) +
+             CRTRPGMOD  MODULE(QTEMP/DEMOSRV) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(DEMOSRV) OUTPUT(*NONE)
              CRTSRVPGM  SRVPGM(&LIB/DEMOSRV) MODULE(QTEMP/DEMOSRV) +
-                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
-                          SRCMBR(DEMOSRVB)
+                          EXPORT(*SRCFILE) SRCFILE(&SRCLIB/QSRVSRC) +
+                          SRCMBR(DEMOSRV)
 
 /* 2. Negative check: the library is still *CURLIB, which is        */
 /*    searched before QTEMP, so MOCKPGM must refuse (MCK0010)       */
@@ -80,18 +82,18 @@
              MOCKBUILD  OBJ(DEMOSRV)
 
 /* 5. Code under test (bound to *LIBL/DEMOSRV) and its tests */
-             CRTRPGMOD  MODULE(QTEMP/DEMOCUT) SRCFILE(&LIB/&SRCF) +
+             CRTRPGMOD  MODULE(QTEMP/DEMOCUT) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(DEMOCUT) OUTPUT(*NONE)
              CRTSRVPGM  SRVPGM(&LIB/DEMOCUT) MODULE(QTEMP/DEMOCUT) +
-                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
-                          SRCMBR(DEMOCUTB) BNDSRVPGM((*LIBL/DEMOSRV))
+                          EXPORT(*SRCFILE) SRCFILE(&SRCLIB/QSRVSRC) +
+                          SRCMBR(DEMOCUT) BNDSRVPGM((*LIBL/DEMOSRV))
              MOCKCHK    PGM(&LIB/DEMOCUT)
              CHGVAR     VAR(&OK) VALUE('1')
              CHGVAR     VAR(&MSG) VALUE('MOCKCHK accepts DEMOCUT')
              CALLSUBR   SUBR(RESULT)
 
              CRTRPGMOD  MODULE(QTEMP/DEMOCUT_T) +
-                          SRCFILE(&LIB/&SRCF) SRCMBR(DEMOCUT_T) +
+                          SRCFILE(&SRCLIB/QRPGLESRC) SRCMBR(DEMOCUT_T) +
                           OUTPUT(*PRINT)
              CRTPGM     PGM(&LIB/DEMOCUT_T) MODULE(QTEMP/DEMOCUT_T) +
                           BNDSRVPGM((&LIB/DEMOCUT) (&LIB/MOCKENG)) +

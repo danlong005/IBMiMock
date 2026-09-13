@@ -1,13 +1,14 @@
 /* ---------------------------------------------------------------- */
 /* MOCKTEST - build and run the RPGMOCK engine unit tests           */
-/*   CALL MOCKTEST PARM('MYLIB' 'QRPGLESRC')                        */
-/*   (defaults: current library, QRPGLESRC)                         */
+/*   CALL MOCKTEST PARM('RPGMOCK' 'SRCLIB')                         */
+/*   1: RPGMOCK library (default: current library)                  */
+/*   2: library holding the source files (default: parameter 1)     */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&PLIB &PSRCF)
+             PGM        PARM(&PLIB &PSRCLIB)
              DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&REPORT) TYPE(*CHAR) LEN(8000)
              DCL        VAR(&FAILS) TYPE(*INT) LEN(4)
              DCL        VAR(&I) TYPE(*INT) LEN(4)
@@ -23,20 +24,20 @@
              RTVJOBA    CURLIB(&LIB)
              CHGVAR     VAR(&LIB) VALUE(&PLIB)
              MONMSG     MSGID(MCH3601)
-             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
-             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             CHGVAR     VAR(&SRCLIB) VALUE(&LIB)
+             CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
              MONMSG     MSGID(MCH3601)
 
              DLTF       FILE(QTEMP/MOCKINC)
              MONMSG     MSGID(CPF2105)
              CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
-             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
                           FROMMBR(MOCKENG_H)
-             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
                           FROMMBR(MOCKTST_H)
 
              CRTRPGMOD  MODULE(QTEMP/MOCKENG_T) +
-                          SRCFILE(&LIB/&SRCF) SRCMBR(MOCKENG_T)
+                          SRCFILE(&SRCLIB/QRPGLESRC) SRCMBR(MOCKENG_T)
              CRTPGM     PGM(&LIB/MOCKENG_T) MODULE(QTEMP/MOCKENG_T) +
                           BNDSRVPGM((&LIB/MOCKENG)) ACTGRP(*NEW)
              CALL       PGM(&LIB/MOCKENG_T) PARM(&REPORT &FAILS)

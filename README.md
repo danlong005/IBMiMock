@@ -59,13 +59,28 @@ Each stub call is handled by `MOCK_INVOKE` in `MOCKENG`:
 ## Install
 
 ```bash
-bash bin/install-rpgmock.sh -l MYLIB            # uses -e/-f from bin/.ibmi-config.json
-bash bin/install-rpgmock.sh -l MYLIB -t         # also runs MOCKTEST + MOCKDEMO
-pwsh -ExecutionPolicy Bypass -File bin/install-rpgmock.ps1 -Library MYLIB -Tests
+bash bin/install-rpgmock.sh -l RPGMOCK          # environment from bin/.ibmi-config.json
+bash bin/install-rpgmock.sh -l RPGMOCK -t       # also runs MOCKTEST + MOCKDEMO
+pwsh -ExecutionPolicy Bypass -File bin/install-rpgmock.ps1 -Library RPGMOCK -Tests
 ```
 
-The script uploads `rpgmock/src` (and `rpgmock/test` with `-t`) as source
-members and runs `CALL MYLIB/MOCKINST PARM('MYLIB' 'QRPGLESRC')`, which creates:
+RPGMOCK is laid out like an IBM i library. Each folder in `rpgmock/` is a
+source physical file, and the script copies it into the file of the same name
+in the target library:
+
+| Folder / source file | Members |
+|---|---|
+| `QRPGLESRC` | `MOCKENG`, `MOCKGEN` (SQLRPGLE), `MOCKCDC`, copybooks `MOCKENG_H` and `MOCK_H` |
+| `QCLLESRC` | `MCK*C` command processing programs, `MOCKINST` installer |
+| `QCMDSRC` | The `MOCK*` command definitions |
+| `QSRVSRC` | `MOCKENG` binder source |
+
+Test and demo members live in the same folders (`DEMO*`, `*_T`, `MOCKTST_H`,
+`MOCKTEST`, `MOCKDEMO`) and are only uploaded with `-t`.
+
+To build without the scripts, put the members in the four source files of a
+library and run `CALL RPGMOCK/MOCKINST PARM('RPGMOCK')`. An optional second
+parameter names a different library holding the source files. The build creates:
 
 | Object | Purpose |
 |---|---|
@@ -218,7 +233,7 @@ dcl-proc test_orderTotal_addsTax export;
 end-proc;
 ```
 
-`rpgmock/test/DEMOCUT_T.rpgle` is a complete working example. It uses a small
+`rpgmock/QRPGLESRC/DEMOCUT_T.rpgle` is a complete working example. It uses a small
 built-in harness instead of RPGUnit.
 
 ## Debugging
@@ -249,7 +264,7 @@ built-in harness instead of RPGUnit.
 
 | Member | What it covers |
 |---|---|
-| `test/MOCKTEST.clle` → `MOCKENG_T` | Codec round trips for every type, rejected values, decimal data errors, matchers |
-| `test/MOCKDEMO.clle` → `DEMOCUT_T` | End to end: a hidden-mock check, `*PGM` and strict `*SRVPGM` mocks, stubs, throws, consecutive returns, argument capture, verification messages, CL `MOCKCOUNT`/`MOCKGETARG`/`MOCKVERIFY`, bad-binding detection, cleanup |
+| `QCLLESRC/MOCKTEST` → `QRPGLESRC/MOCKENG_T` | Codec round trips for every type, rejected values, decimal data errors, matchers |
+| `QCLLESRC/MOCKDEMO` → `QRPGLESRC/DEMOCUT_T` | End to end: a hidden-mock check, `*PGM` and strict `*SRVPGM` mocks, stubs, throws, consecutive returns, argument capture, verification messages, CL `MOCKCOUNT`/`MOCKGETARG`/`MOCKVERIFY`, bad-binding detection, cleanup |
 
-Run both with `bash bin/install-rpgmock.sh -l MYLIB -t`.
+Run both with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, or on the system with `CALL RPGMOCK/MOCKTEST` and `CALL RPGMOCK/MOCKDEMO`.

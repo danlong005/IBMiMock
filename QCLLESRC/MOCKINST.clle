@@ -1,15 +1,16 @@
 /* ---------------------------------------------------------------- */
 /* MOCKINST - build RPGMOCK into a library                          */
 /*                                                                  */
-/*   CALL MOCKINST PARM('MYLIB' 'QRPGLESRC')                        */
-/*   Both parameters are optional: library defaults to the current  */
-/*   library, source file to QRPGLESRC.                             */
+/*   CALL MOCKINST PARM('RPGMOCK' 'SRCLIB')                         */
+/*   1: library to build into (default: current library)            */
+/*   2: library holding QRPGLESRC, QCLLESRC, QCMDSRC and QSRVSRC    */
+/*      (default: the build library)                                */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&PLIB &PSRCF)
+             PGM        PARM(&PLIB &PSRCLIB)
              DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&CPP) TYPE(*CHAR) LEN(10)
              DCL        VAR(&CMD) TYPE(*CHAR) LEN(10)
              DCL        VAR(&MSGF) TYPE(*CHAR) LEN(20)
@@ -23,8 +24,8 @@
              RTVJOBA    CURLIB(&LIB)
              CHGVAR     VAR(&LIB) VALUE(&PLIB)
              MONMSG     MSGID(MCH3601)
-             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
-             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             CHGVAR     VAR(&SRCLIB) VALUE(&LIB)
+             CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
              MONMSG     MSGID(MCH3601)
 
              ADDLIBLE   LIB(&LIB)
@@ -35,21 +36,21 @@
              DLTF       FILE(QTEMP/MOCKINC)
              MONMSG     MSGID(CPF2105)
              CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
-             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
                           FROMMBR(MOCKENG_H)
 
              CHGVAR     VAR(&STEP) VALUE('message file')
              CALLSUBR   SUBR(MSGFILE)
 
              CHGVAR     VAR(&STEP) VALUE('MOCKCDC module')
-             CRTRPGMOD  MODULE(QTEMP/MOCKCDC) SRCFILE(&LIB/&SRCF) +
+             CRTRPGMOD  MODULE(QTEMP/MOCKCDC) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(MOCKCDC) DBGVIEW(*SOURCE)
              CHGVAR     VAR(&STEP) VALUE('MOCKENG module')
-             CRTSQLRPGI OBJ(QTEMP/MOCKENG) SRCFILE(&LIB/&SRCF) +
+             CRTSQLRPGI OBJ(QTEMP/MOCKENG) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(MOCKENG) COMMIT(*NONE) +
                           OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
              CHGVAR     VAR(&STEP) VALUE('MOCKGEN module')
-             CRTSQLRPGI OBJ(QTEMP/MOCKGEN) SRCFILE(&LIB/&SRCF) +
+             CRTSQLRPGI OBJ(QTEMP/MOCKGEN) SRCFILE(&SRCLIB/QRPGLESRC) +
                           SRCMBR(MOCKGEN) COMMIT(*NONE) +
                           OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
              CHGVAR     VAR(&STEP) VALUE('MOCKENG service program')
@@ -57,8 +58,8 @@
              MONMSG     MSGID(CPF2105)
              CRTSRVPGM  SRVPGM(&LIB/MOCKENG) MODULE(QTEMP/MOCKCDC +
                           QTEMP/MOCKENG QTEMP/MOCKGEN) +
-                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
-                          SRCMBR(MOCKENGB) ACTGRP(RPGMOCK) +
+                          EXPORT(*SRCFILE) SRCFILE(&SRCLIB/QSRVSRC) +
+                          SRCMBR(MOCKENG) ACTGRP(RPGMOCK) +
                           TEXT('RPGMOCK engine')
 
              CHGVAR     VAR(&CPP) VALUE('MCKPGMC')
@@ -117,7 +118,7 @@
 /* ---- compile one command processing program and its command ---- */
              SUBR       SUBR(BUILD)
              CHGVAR     VAR(&STEP) VALUE(&CPP)
-             CRTCLMOD   MODULE(QTEMP/&CPP) SRCFILE(&LIB/&SRCF) +
+             CRTCLMOD   MODULE(QTEMP/&CPP) SRCFILE(&SRCLIB/QCLLESRC) +
                           SRCMBR(&CPP)
              DLTPGM     PGM(&LIB/&CPP)
              MONMSG     MSGID(CPF2105)
@@ -130,12 +131,12 @@
              IF         COND(&CMD *EQ 'MOCKGETARG' *OR &CMD *EQ +
                           'MOCKCOUNT') THEN(DO)
              CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
-                          SRCFILE(&LIB/&SRCF) SRCMBR(&CMD) +
+                          SRCFILE(&SRCLIB/QCMDSRC) SRCMBR(&CMD) +
                           ALLOW(*IPGM *BPGM *IMOD *BMOD)
              ENDDO
              ELSE       CMD(DO)
              CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
-                          SRCFILE(&LIB/&SRCF) SRCMBR(&CMD)
+                          SRCFILE(&SRCLIB/QCMDSRC) SRCMBR(&CMD)
              ENDDO
              ENDSUBR
 
