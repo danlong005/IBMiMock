@@ -1,0 +1,45 @@
+**free
+// ------------------------------------------------------------------
+// MOCK_H - RPGMOCK API for test programs (RPGUnit or plain RPG)
+//
+//   Bind with service program MOCKENG (BNDSRVPGM or a binding dir).
+//
+//   mock('MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
+//   assert(mock_ok('MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) +
+//          TIMES(*ONCE)') : mock_lastError());
+// ------------------------------------------------------------------
+/if defined(MOCK_H)
+/eof
+/endif
+/define MOCK_H
+
+// Run any MOCK* command. Sends escape message MCK0300 if it fails.
+dcl-pr mock extproc('MOCK_RUN');
+  cmd varchar(3000) const;
+end-pr;
+
+// Run any MOCK* command. Returns *off if it failed (for assertions).
+dcl-pr mock_ok ind extproc('MOCK_OK');
+  cmd varchar(3000) const;
+end-pr;
+
+// Text of the last failure (verification message, strict-mock call...)
+dcl-pr mock_lastError varchar(512) extproc('MOCK_LASTERROR') end-pr;
+
+// Captured argument as text: callNo 1..n or MOCK_LAST, parmNo 1..64.
+// Returns *OMIT / *NOTPASSED for missing arguments.
+dcl-pr mock_arg varchar(1024) extproc('MOCK_ARG');
+  obj char(10) const;
+  proc varchar(4096) const;
+  callNo int(10) const;
+  parmNo int(10) const;
+end-pr;
+
+// Number of recorded calls (-1 if the mock or procedure is unknown)
+dcl-pr mock_count int(10) extproc('MOCK_COUNT');
+  obj char(10) const;
+  proc varchar(4096) const;
+end-pr;
+
+dcl-c MOCK_LAST -1;
+dcl-c MOCK_PGM '*PGM';

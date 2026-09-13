@@ -1,0 +1,70 @@
+/* ---------------------------------------------------------------- */
+/* MCKCHKC - RPGMOCK command processing program for MOCKCHK         */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&PGMQ)
+             DCL        VAR(&PGMQ) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&OUT) TYPE(*CHAR) LEN(5000)
+             DCL        VAR(&CNT) TYPE(*INT) LEN(4)
+             DCL        VAR(&I) TYPE(*INT) LEN(4)
+             DCL        VAR(&POS) TYPE(*INT) LEN(4)
+             DCL        VAR(&LINE) TYPE(*CHAR) LEN(250)
+             DCL        VAR(&NBR) TYPE(*CHAR) LEN(4)
+             DCL        VAR(&ALL) TYPE(*CHAR) LEN(5100)
+             DCL        VAR(&ERR) TYPE(*CHAR) LEN(529)
+             DCL        VAR(&ERRID) TYPE(*CHAR) LEN(7) STG(*DEFINED) +
+                          DEFVAR(&ERR 1)
+             DCL        VAR(&ERRLIB) TYPE(*CHAR) LEN(10) STG(*DEFINED) +
+                          DEFVAR(&ERR 8)
+             DCL        VAR(&ERRTXT) TYPE(*CHAR) LEN(512) STG(*DEFINED) +
+                          DEFVAR(&ERR 18)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&CLMSGID) TYPE(*CHAR) LEN(7)
+
+             MONMSG     MSGID(CPF0000 MCH0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CALLPRC    PRC('MOCK_CL_CHECK') PARM((&PGMQ) (&OUT) +
+                          (&CNT) (&ERR))
+             IF         COND(&ERRID *NE ' ') THEN(GOTO CMDLBL(MOCKERR))
+
+             CHGVAR     VAR(&ALL) VALUE(' ')
+             DOFOR      VAR(&I) FROM(1) TO(&CNT)
+             CHGVAR     VAR(&POS) VALUE((&I - 1) * 250 + 1)
+             CHGVAR     VAR(&LINE) VALUE(%SST(&OUT &POS 250))
+             SNDPGMMSG  MSGID(MCK0020) MSGF(&ERRLIB/MOCKMSGF) +
+                          MSGDTA(&LINE) MSGTYPE(*DIAG)
+             CHGVAR     VAR(&ALL) VALUE(&ALL *TCAT ' (' *CAT +
+                          %CHAR(&I) *TCAT ')' *BCAT &LINE)
+             ENDDO
+
+             IF         COND(&CNT *GT 0) THEN(DO)
+             CHGVAR     VAR(&NBR) VALUE(%CHAR(&CNT))
+             CHGVAR     VAR(&MSG) VALUE('MOCKCHK found' *BCAT +
+                          %TRIM(&NBR) *BCAT 'problem(s):' *CAT &ALL)
+             CHGVAR     VAR(&CLMSGID) VALUE('MCK0021')
+             GOTO       CMDLBL(CLERR)
+             ENDDO
+             SNDPGMMSG  MSGID(MCK0001) MSGF(&ERRLIB/MOCKMSGF) +
+                          MSGDTA('MOCKCHK found no problems') +
+                          MSGTYPE(*COMP)
+             RETURN
+
+/* ---- error exits ------------------------------------------------ */
+ MOCKERR:    SNDPGMMSG  MSGID(&ERRID) MSGF(&ERRLIB/MOCKMSGF) +
+                          MSGDTA(&ERRTXT) MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             RETURN
+
+ CLERR:      CALLPRC    PRC('MOCK_CL_FAIL') PARM((&CLMSGID) (&MSG) (&ERR))
+             MONMSG     MSGID(CPF0000 MCH0000)
+             SNDPGMMSG  MSGID(&CLMSGID) MSGF(&ERRLIB/MOCKMSGF) MSGDTA(&MSG) +
+                          MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000) EXEC(SNDPGMMSG MSGID(CPF9898) +
+                          MSGF(QCPFMSG) MSGDTA(&MSG) MSGTYPE(*ESCAPE))
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*YES) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(&CLMSGID) VALUE('MCK0015')
+             GOTO       CMDLBL(CLERR)
+             ENDPGM

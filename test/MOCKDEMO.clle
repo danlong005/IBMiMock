@@ -1,0 +1,182 @@
+/* ---------------------------------------------------------------- */
+/* MOCKDEMO - RPGMOCK end-to-end demo / acceptance test             */
+/*                                                                  */
+/* A typical CL test driver: create mocks in QTEMP, compile the     */
+/* code under test and its tests, run them, verify from CL, clean   */
+/* up. Everything runs in one job because QTEMP belongs to the job. */
+/*                                                                  */
+/*   CALL MOCKDEMO PARM('MYLIB' 'QRPGLESRC')                        */
+/*   (defaults: current library, QRPGLESRC)                         */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&PLIB &PSRCF)
+             DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&REPORT) TYPE(*CHAR) LEN(8000)
+             DCL        VAR(&FAILS) TYPE(*INT) LEN(4)
+             DCL        VAR(&PROBS) TYPE(*INT) LEN(4)
+             DCL        VAR(&I) TYPE(*INT) LEN(4)
+             DCL        VAR(&POS) TYPE(*INT) LEN(4)
+             DCL        VAR(&LINE) TYPE(*CHAR) LEN(200)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&OK) TYPE(*LGL)
+             DCL        VAR(&NAME) TYPE(*CHAR) LEN(50)
+             DCL        VAR(&FOUND) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&ARG) TYPE(*CHAR) LEN(256)
+             DCL        VAR(&CNT) TYPE(*DEC) LEN(10 0)
+             DCL        VAR(&NBR) TYPE(*CHAR) LEN(12)
+
+             MONMSG     MSGID(CPF0000 MCH0000 RNS0000 MCK0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CHGJOB     INQMSGRPY(*DFT)
+             RTVJOBA    CURLIB(&LIB)
+             CHGVAR     VAR(&LIB) VALUE(&PLIB)
+             MONMSG     MSGID(MCH3601)
+             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
+             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             MONMSG     MSGID(MCH3601)
+
+/* Test copybooks are included from QTEMP/MOCKINC */
+             DLTF       FILE(QTEMP/MOCKINC)
+             MONMSG     MSGID(CPF2105)
+             CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
+             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+                          FROMMBR(MOCK_H)
+             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+                          FROMMBR(MOCKTST_H)
+
+/* 1. The real dependencies (in a real project they already exist) */
+             CRTBNDRPG  PGM(&LIB/DEMODEP) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(DEMODEP) OUTPUT(*NONE)
+             CRTRPGMOD  MODULE(QTEMP/DEMOSRV) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(DEMOSRV) OUTPUT(*NONE)
+             CRTSRVPGM  SRVPGM(&LIB/DEMOSRV) MODULE(QTEMP/DEMOSRV) +
+                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(DEMOSRVB)
+
+/* 2. Negative check: the library is still *CURLIB, which is        */
+/*    searched before QTEMP, so MOCKPGM must refuse (MCK0010)       */
+             CHGVAR     VAR(&OK) VALUE('0')
+             MOCKPGM    OBJ(DEMODEP)
+             MONMSG     MSGID(MCK0010) EXEC(CHGVAR VAR(&OK) VALUE('1'))
+             CHGVAR     VAR(&MSG) VALUE('hidden mock detected +
+                          (MCK0010) while' *BCAT &LIB *BCAT 'is +
+                          *CURLIB')
+             CALLSUBR   SUBR(RESULT)
+
+/* 3. Put the library behind QTEMP */
+             CHGCURLIB  CURLIB(*CRTDFT)
+             ADDLIBLE   LIB(&LIB) POSITION(*LAST)
+             MONMSG     MSGID(CPF2103)
+
+/* 4. Mocks */
+             MOCKPGM    OBJ(DEMODEP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
+             MOCKSRVPGM OBJ(DEMOSRV) BEHAVIOR(*STRICT)
+             MOCKPROC   OBJ(DEMOSRV) PROC(DEMO_CALCTAX) +
+                          RTNTYPE(*PACKED 11 2) +
+                          PARMS((*PACKED 11 2 *CONST) (*CHAR 2 *CONST))
+             MOCKBUILD  OBJ(DEMOSRV)
+
+/* 5. Code under test (bound to *LIBL/DEMOSRV) and its tests */
+             CRTRPGMOD  MODULE(QTEMP/DEMOCUT) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(DEMOCUT) OUTPUT(*NONE)
+             CRTSRVPGM  SRVPGM(&LIB/DEMOCUT) MODULE(QTEMP/DEMOCUT) +
+                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(DEMOCUTB) BNDSRVPGM((*LIBL/DEMOSRV))
+             MOCKCHK    PGM(&LIB/DEMOCUT)
+             CHGVAR     VAR(&OK) VALUE('1')
+             CHGVAR     VAR(&MSG) VALUE('MOCKCHK accepts DEMOCUT')
+             CALLSUBR   SUBR(RESULT)
+
+             CRTRPGMOD  MODULE(QTEMP/DEMOCUT_T) +
+                          SRCFILE(&LIB/&SRCF) SRCMBR(DEMOCUT_T) +
+                          OUTPUT(*PRINT)
+             CRTPGM     PGM(&LIB/DEMOCUT_T) MODULE(QTEMP/DEMOCUT_T) +
+                          BNDSRVPGM((&LIB/DEMOCUT) (&LIB/MOCKENG)) +
+                          ACTGRP(*NEW)
+             CALL       PGM(&LIB/DEMOCUT_T) PARM(&REPORT &FAILS)
+             DOFOR      VAR(&I) FROM(1) TO(40)
+             CHGVAR     VAR(&POS) VALUE((&I - 1) * 200 + 1)
+             CHGVAR     VAR(&LINE) VALUE(%SST(&REPORT &POS 200))
+             IF         COND(&LINE *NE ' ') THEN(SNDPGMMSG +
+                          MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&LINE) +
+                          MSGTYPE(*DIAG))
+             ENDDO
+
+/* 6. Mocks are usable straight from CL too */
+             MOCKRESET
+             MOCKWHEN   OBJ(DEMODEP) SETPARM((2 'FROM CL') (3 '1'))
+             CALL       PGM(DEMODEP) PARM('C900' &NAME &FOUND)
+             MOCKCOUNT  OBJ(DEMODEP) RTNVAL(&CNT)
+             MOCKGETARG OBJ(DEMODEP) PARM(1) RTNVAL(&ARG)
+             CHGVAR     VAR(&OK) VALUE(&CNT *EQ 1 *AND &ARG *EQ +
+                          'C900' *AND &NAME *EQ 'FROM CL' *AND +
+                          &FOUND *EQ '1')
+             CHGVAR     VAR(&NBR) VALUE(%CHAR(&CNT))
+             CHGVAR     VAR(&MSG) VALUE('CL call, MOCKCOUNT (' *CAT +
+                          %TRIM(&NBR) *TCAT ') and MOCKGETARG (' *CAT +
+                          %TRIM(&ARG) *TCAT ')')
+             CALLSUBR   SUBR(RESULT)
+             CHGVAR     VAR(&OK) VALUE('0')
+             MOCKVERIFY OBJ(DEMODEP) TIMES(*NEVER)
+             MONMSG     MSGID(MCK0200) EXEC(CHGVAR VAR(&OK) VALUE('1'))
+             CHGVAR     VAR(&MSG) VALUE('MOCKVERIFY failure can be +
+                          monitored in CL (MCK0200)')
+             CALLSUBR   SUBR(RESULT)
+
+/* 7. Negative check: binding to an explicit library is reported */
+             CRTSRVPGM  SRVPGM(&LIB/DEMOCUTX) MODULE(QTEMP/DEMOCUT) +
+                          EXPORT(*ALL) BNDSRVPGM((&LIB/DEMOSRV))
+             CHGVAR     VAR(&OK) VALUE('0')
+             MOCKCHK    PGM(&LIB/DEMOCUTX)
+             MONMSG     MSGID(MCK0021) EXEC(CHGVAR VAR(&OK) VALUE('1'))
+             CHGVAR     VAR(&MSG) VALUE('MOCKCHK reports a hard-coded +
+                          library binding (MCK0021)')
+             CALLSUBR   SUBR(RESULT)
+             DLTSRVPGM  SRVPGM(&LIB/DEMOCUTX)
+
+/* 8. Clean up */
+             MOCKRMV
+             CHGVAR     VAR(&OK) VALUE('0')
+             CHKOBJ     OBJ(QTEMP/DEMODEP) OBJTYPE(*PGM)
+             MONMSG     MSGID(CPF9801) EXEC(CHGVAR VAR(&OK) VALUE('1'))
+             CHGVAR     VAR(&MSG) VALUE('MOCKRMV deleted QTEMP/DEMODEP')
+             CALLSUBR   SUBR(RESULT)
+             CHGVAR     VAR(&OK) VALUE('0')
+             CHKOBJ     OBJ(QTEMP/DEMOSRV) OBJTYPE(*SRVPGM)
+             MONMSG     MSGID(CPF9801) EXEC(CHGVAR VAR(&OK) VALUE('1'))
+             CHGVAR     VAR(&MSG) VALUE('MOCKRMV deleted QTEMP/DEMOSRV')
+             CALLSUBR   SUBR(RESULT)
+
+             CHGVAR     VAR(&FAILS) VALUE(&FAILS + &PROBS)
+             IF         COND(&FAILS *GT 0) THEN(DO)
+             CHGVAR     VAR(&NBR) VALUE(%CHAR(&FAILS))
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('MOCKDEMO: +
+                          ' *CAT %TRIM(&NBR) *BCAT 'failure(s)') +
+                          MSGTYPE(*ESCAPE)
+             ENDDO
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('MOCKDEMO: +
+                          all checks passed') MSGTYPE(*COMP)
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('MOCKDEMO +
+                          stopped:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             RETURN
+
+/* ---- report one driver-level check -------------------------------- */
+             SUBR       SUBR(RESULT)
+             IF         COND(&OK) THEN(SNDPGMMSG MSGID(CPF9897) +
+                          MSGF(QCPFMSG) MSGDTA('ok   ' *CAT &MSG) +
+                          MSGTYPE(*DIAG))
+             ELSE       CMD(DO)
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('FAIL ' +
+                          *CAT &MSG) MSGTYPE(*DIAG)
+             CHGVAR     VAR(&PROBS) VALUE(&PROBS + 1)
+             ENDDO
+             ENDSUBR
+             ENDPGM

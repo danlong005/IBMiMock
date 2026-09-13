@@ -1,0 +1,189 @@
+/* ---------------------------------------------------------------- */
+/* MOCKINST - build RPGMOCK into a library                          */
+/*                                                                  */
+/*   CALL MOCKINST PARM('MYLIB' 'QRPGLESRC')                        */
+/*   Both parameters are optional: library defaults to the current  */
+/*   library, source file to QRPGLESRC.                             */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&PLIB &PSRCF)
+             DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CPP) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CMD) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGF) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&STEP) TYPE(*CHAR) LEN(40)
+
+             MONMSG     MSGID(CPF0000 MCH0000 RNS0000 SQL0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CHGJOB     INQMSGRPY(*DFT)
+             RTVJOBA    CURLIB(&LIB)
+             CHGVAR     VAR(&LIB) VALUE(&PLIB)
+             MONMSG     MSGID(MCH3601)
+             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
+             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             MONMSG     MSGID(MCH3601)
+
+             ADDLIBLE   LIB(&LIB)
+             MONMSG     MSGID(CPF2103)
+
+/* Engine copybook is included from QTEMP so any source file works */
+             CHGVAR     VAR(&STEP) VALUE('copybook')
+             DLTF       FILE(QTEMP/MOCKINC)
+             MONMSG     MSGID(CPF2105)
+             CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
+             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+                          FROMMBR(MOCKENG_H)
+
+             CHGVAR     VAR(&STEP) VALUE('message file')
+             CALLSUBR   SUBR(MSGFILE)
+
+             CHGVAR     VAR(&STEP) VALUE('MOCKCDC module')
+             CRTRPGMOD  MODULE(QTEMP/MOCKCDC) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(MOCKCDC) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('MOCKENG module')
+             CRTSQLRPGI OBJ(QTEMP/MOCKENG) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(MOCKENG) COMMIT(*NONE) +
+                          OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('MOCKGEN module')
+             CRTSQLRPGI OBJ(QTEMP/MOCKGEN) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(MOCKGEN) COMMIT(*NONE) +
+                          OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('MOCKENG service program')
+             DLTSRVPGM  SRVPGM(&LIB/MOCKENG)
+             MONMSG     MSGID(CPF2105)
+             CRTSRVPGM  SRVPGM(&LIB/MOCKENG) MODULE(QTEMP/MOCKCDC +
+                          QTEMP/MOCKENG QTEMP/MOCKGEN) +
+                          EXPORT(*SRCFILE) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(MOCKENGB) ACTGRP(RPGMOCK) +
+                          TEXT('RPGMOCK engine')
+
+             CHGVAR     VAR(&CPP) VALUE('MCKPGMC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKPGM')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKSRVC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKSRVPGM')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKPRCC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKPROC')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKBLDC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKBUILD')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKWHNC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKWHEN')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKVFYC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKVERIFY')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKNMRC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKNOMORE')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKARGC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKGETARG')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKCNTC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKCOUNT')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKRSTC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKRESET')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKRMVC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKRMV')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('MCKCHKC')
+             CHGVAR     VAR(&CMD) VALUE('MOCKCHK')
+             CALLSUBR   SUBR(BUILD)
+
+             CHGVAR     VAR(&MSG) VALUE('RPGMOCK installed in' *BCAT +
+                          &LIB)
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&MSG) +
+                          MSGTYPE(*COMP)
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(&MSG) VALUE('MOCKINST failed at' *BCAT +
+                          &STEP *TCAT ':' *BCAT &MSG)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA(&MSG) +
+                          MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             RETURN
+
+/* ---- compile one command processing program and its command ---- */
+             SUBR       SUBR(BUILD)
+             CHGVAR     VAR(&STEP) VALUE(&CPP)
+             CRTCLMOD   MODULE(QTEMP/&CPP) SRCFILE(&LIB/&SRCF) +
+                          SRCMBR(&CPP)
+             DLTPGM     PGM(&LIB/&CPP)
+             MONMSG     MSGID(CPF2105)
+             CRTPGM     PGM(&LIB/&CPP) MODULE(QTEMP/&CPP) +
+                          BNDSRVPGM((&LIB/MOCKENG)) ACTGRP(*CALLER)
+             DLTMOD     MODULE(QTEMP/&CPP)
+             CHGVAR     VAR(&STEP) VALUE(&CMD)
+             DLTCMD     CMD(&LIB/&CMD)
+             MONMSG     MSGID(CPF2105)
+             IF         COND(&CMD *EQ 'MOCKGETARG' *OR &CMD *EQ +
+                          'MOCKCOUNT') THEN(DO)
+             CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
+                          SRCFILE(&LIB/&SRCF) SRCMBR(&CMD) +
+                          ALLOW(*IPGM *BPGM *IMOD *BMOD)
+             ENDDO
+             ELSE       CMD(DO)
+             CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
+                          SRCFILE(&LIB/&SRCF) SRCMBR(&CMD)
+             ENDDO
+             ENDSUBR
+
+/* ---- message file ------------------------------------------------ */
+             SUBR       SUBR(MSGFILE)
+             CHGVAR     VAR(&MSGF) VALUE('MOCKMSGF  ' *CAT &LIB)
+             DLTMSGF    MSGF(&LIB/MOCKMSGF)
+             MONMSG     MSGID(CPF2105)
+             CRTMSGF    MSGF(&LIB/MOCKMSGF) TEXT('RPGMOCK messages')
+             ADDMSGD    MSGID(MCK0001) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(0) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0010) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('The object found first in the +
+                          library list is not the mock in QTEMP, so +
+                          the code under test would call the real +
+                          object. The current library and product +
+                          libraries are searched before QTEMP.') +
+                          SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0011) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0012) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0013) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0014) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0015) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0020) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(20) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0021) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0100) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('A strict mock received a call that +
+                          no MOCKWHEN matched.') SEV(40) +
+                          FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0101) MSGF(&LIB/MOCKMSGF) +
+                          MSG('Mock threw: &1') SECLVL('Escape message +
+                          sent by MOCKWHEN THROW(*MOCK).') SEV(40) +
+                          FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0200) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0201) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0202) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(MCK0300) MSGF(&LIB/MOCKMSGF) MSG('&1') +
+                          SECLVL('A command run with mock() failed.') +
+                          SEV(40) FMT((*CHAR 512))
+             ENDSUBR
+             ENDPGM

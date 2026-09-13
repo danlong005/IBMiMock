@@ -1,0 +1,67 @@
+/* ---------------------------------------------------------------- */
+/* MOCKTEST - build and run the RPGMOCK engine unit tests           */
+/*   CALL MOCKTEST PARM('MYLIB' 'QRPGLESRC')                        */
+/*   (defaults: current library, QRPGLESRC)                         */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&PLIB &PSRCF)
+             DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCF) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&REPORT) TYPE(*CHAR) LEN(8000)
+             DCL        VAR(&FAILS) TYPE(*INT) LEN(4)
+             DCL        VAR(&I) TYPE(*INT) LEN(4)
+             DCL        VAR(&POS) TYPE(*INT) LEN(4)
+             DCL        VAR(&LINE) TYPE(*CHAR) LEN(200)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&NBR) TYPE(*CHAR) LEN(12)
+
+             MONMSG     MSGID(CPF0000 MCH0000 RNS0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CHGJOB     INQMSGRPY(*DFT)
+             RTVJOBA    CURLIB(&LIB)
+             CHGVAR     VAR(&LIB) VALUE(&PLIB)
+             MONMSG     MSGID(MCH3601)
+             CHGVAR     VAR(&SRCF) VALUE('QRPGLESRC')
+             CHGVAR     VAR(&SRCF) VALUE(&PSRCF)
+             MONMSG     MSGID(MCH3601)
+
+             DLTF       FILE(QTEMP/MOCKINC)
+             MONMSG     MSGID(CPF2105)
+             CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
+             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+                          FROMMBR(MOCKENG_H)
+             CPYSRCF    FROMFILE(&LIB/&SRCF) TOFILE(QTEMP/MOCKINC) +
+                          FROMMBR(MOCKTST_H)
+
+             CRTRPGMOD  MODULE(QTEMP/MOCKENG_T) +
+                          SRCFILE(&LIB/&SRCF) SRCMBR(MOCKENG_T)
+             CRTPGM     PGM(&LIB/MOCKENG_T) MODULE(QTEMP/MOCKENG_T) +
+                          BNDSRVPGM((&LIB/MOCKENG)) ACTGRP(*NEW)
+             CALL       PGM(&LIB/MOCKENG_T) PARM(&REPORT &FAILS)
+
+             DOFOR      VAR(&I) FROM(1) TO(40)
+             CHGVAR     VAR(&POS) VALUE((&I - 1) * 200 + 1)
+             CHGVAR     VAR(&LINE) VALUE(%SST(&REPORT &POS 200))
+             IF         COND(&LINE *NE ' ') THEN(SNDPGMMSG +
+                          MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&LINE) +
+                          MSGTYPE(*DIAG))
+             ENDDO
+
+             IF         COND(&FAILS *GT 0) THEN(DO)
+             CHGVAR     VAR(&NBR) VALUE(%CHAR(&FAILS))
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('MOCKTEST: +
+                          ' *CAT %TRIM(&NBR) *BCAT 'test(s) failed') +
+                          MSGTYPE(*ESCAPE)
+             ENDDO
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('MOCKTEST: +
+                          all tests passed') MSGTYPE(*COMP)
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('MOCKTEST +
+                          stopped:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             ENDPGM

@@ -1,0 +1,41 @@
+/* ---------------------------------------------------------------- */
+/* MOCKENGB - binder source for service program MOCKENG (RPGMOCK)   */
+/* Append new exports at the end; never reorder or remove.          */
+/* ---------------------------------------------------------------- */
+STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('RPGMOCK V1')
+  /* stub runtime */
+  EXPORT     SYMBOL(MOCK_INVOKE)
+  /* public API for test programs (MOCK_H) */
+  EXPORT     SYMBOL(MOCK_RUN)
+  EXPORT     SYMBOL(MOCK_OK)
+  EXPORT     SYMBOL(MOCK_LASTERROR)
+  EXPORT     SYMBOL(MOCK_ARG)
+  EXPORT     SYMBOL(MOCK_COUNT)
+  /* command processing program entries */
+  EXPORT     SYMBOL(MOCK_CL_DEFPGM)
+  EXPORT     SYMBOL(MOCK_CL_DEFSRV)
+  EXPORT     SYMBOL(MOCK_CL_DEFPROC)
+  EXPORT     SYMBOL(MOCK_CL_GENSRV)
+  EXPORT     SYMBOL(MOCK_CL_SETBUILT)
+  EXPORT     SYMBOL(MOCK_CL_FAIL)
+  EXPORT     SYMBOL(MOCK_CL_WHEN)
+  EXPORT     SYMBOL(MOCK_CL_VERIFY)
+  EXPORT     SYMBOL(MOCK_CL_NOMORE)
+  EXPORT     SYMBOL(MOCK_CL_GETARG)
+  EXPORT     SYMBOL(MOCK_CL_COUNT)
+  EXPORT     SYMBOL(MOCK_CL_RESET)
+  EXPORT     SYMBOL(MOCK_CL_LIST)
+  EXPORT     SYMBOL(MOCK_CL_FORGET)
+  EXPORT     SYMBOL(MOCK_CL_CHECK)
+  /* internals exported for the MOCKENG_T unit tests */
+  EXPORT     SYMBOL(MOCK_NORMDEF)
+  EXPORT     SYMBOL(MOCK_DECODE)
+  EXPORT     SYMBOL(MOCK_ENCODE)
+  EXPORT     SYMBOL(MOCK_MATCH)
+  EXPORT     SYMBOL(MOCK_ISNUMERIC)
+  EXPORT     SYMBOL(MOCK_RPGTYPE)
+  EXPORT     SYMBOL(MOCK_VALIDMATCHER)
+  EXPORT     SYMBOL(MOCK_GENPGM)
+  EXPORT     SYMBOL(MOCK_GENSRV)
+  EXPORT     SYMBOL(MOCK_READEXPORTS)
+ENDPGMEXP
