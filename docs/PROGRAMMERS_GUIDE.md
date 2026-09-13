@@ -84,7 +84,7 @@ QTEMP belongs to a job. Creating mocks in one SSH session and running tests in a
 
 ## 3. Your first mocked test
 
-The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in `rpgmock/test` (`DEMOCUT`, `DEMODEP`, `DEMOSRV`, `MOCKDEMO`). Run `CALL MYLIB/MOCKDEMO` to see it pass.
+The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in the RPGMOCK library (`DEMOCUT`, `DEMODEP`, `DEMOSRV` in `QRPGLESRC`; driver `MOCKDEMO` in `QCLLESRC`). Run `CALL RPGMOCK/MOCKDEMO` to see it pass.
 
 ### Step 1: Read the code under test
 
@@ -466,4 +466,4 @@ select * from qtemp.mock_sig;                          -- declared layouts
 
 ---
 
-Source, installer and self-tests live in `rpgmock/` in the repository. Install or refresh a library with `bash bin/install-rpgmock.sh -l MYLIB -t`, which also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
+RPGMOCK's source lives in `rpgmock/` in the repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Install or refresh a library with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, which also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
