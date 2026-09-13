@@ -70,8 +70,9 @@
 
 /* 3. Put the library behind QTEMP */
              CHGCURLIB  CURLIB(*CRTDFT)
+             RMVLIBLE   LIB(&LIB)
+             MONMSG     MSGID(CPF2104)
              ADDLIBLE   LIB(&LIB) POSITION(*LAST)
-             MONMSG     MSGID(CPF2103)
 
 /* 4. Mocks */
              MOCKPGM    OBJ(DEMODEP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
