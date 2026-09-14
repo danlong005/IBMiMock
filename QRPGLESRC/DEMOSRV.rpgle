@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// DEMOSRV - RPGMOCK demo dependency (*SRVPGM): tax service.
+// DEMOSRV - IBMIMOCK demo dependency (*SRVPGM): tax service.
 // ------------------------------------------------------------------
 ctl-opt nomain;
 

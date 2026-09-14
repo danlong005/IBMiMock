@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCKTST_H - minimal test harness for the RPGMOCK demo and unit
+// MOCKTST_H - minimal test harness for the IBMIMOCK demo and unit
 // tests (used where RPGUnit is not installed). Include after the
 // test module's own global declarations.
 // ------------------------------------------------------------------

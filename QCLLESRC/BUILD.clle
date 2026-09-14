@@ -1,16 +1,16 @@
 /* ---------------------------------------------------------------- */
-/* BUILD - build RPGMOCK from a copy of the IBMiMock repository     */
+/* BUILD - build IBMIMOCK from a copy of the IBMiMock repository   */
 /*                                                                  */
 /* 1. Put the repository in the IFS, for example:                   */
-/*      git clone <repo url> /home/ME/IBMiMock                      */
+/*      git clone <repo url> /home/ME/IBMiMock                     */
 /* 2. Compile this program straight from the IFS:                   */
 /*      CRTBNDCL PGM(QTEMP/BUILD)                                   */
-/*        SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')          */
+/*        SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')         */
 /* 3. Run it:                                                       */
-/*      CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock')        */
+/*      CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock')      */
 /*    or, for a path longer than 32 characters:                     */
-/*      CHGCURDIR DIR('/a/long/path/to/IBMiMock')                   */
-/*      CALL QTEMP/BUILD PARM('RPGMOCK' '*CURDIR' '*YES')           */
+/*      CHGCURDIR DIR('/a/long/path/to/IBMiMock')                  */
+/*      CALL QTEMP/BUILD PARM('IBMIMOCK' '*CURDIR' '*YES')          */
 /*                                                                  */
 /* Parameters                                                       */
 /*   1  Library to build into. Created if it does not exist.        */
@@ -74,7 +74,7 @@
              MONMSG     MSGID(CPF9801) EXEC(DO)
 /* run through QCMDEXC so BUILD compiles for users without CRTLIB   */
              CHGVAR     VAR(&CMD) VALUE('CRTLIB LIB(' *CAT %TRIMR(&LIB) +
-                          *TCAT ') TEXT(''RPGMOCK mocking framework'')')
+                          *TCAT ') TEXT(''IBMIMOCK mocking framework'')')
              CALL       PGM(QCMDEXC) PARM(&CMD 200)
              ENDDO
 
@@ -140,7 +140,7 @@
              CALLSUBR   SUBR(RUNTEST)
              ENDDO
 
-             CHGVAR     VAR(&MSG) VALUE('RPGMOCK built in library' +
+             CHGVAR     VAR(&MSG) VALUE('IBMIMOCK built in library' +
                           *BCAT &LIB)
              SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&MSG) +
                           MSGTYPE(*COMP)

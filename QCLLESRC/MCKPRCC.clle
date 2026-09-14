@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKPRCC - RPGMOCK command processing program for MOCKPROC        */
+/* MCKPRCC - IBMIMOCK command processing program for MOCKPROC       */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &PROC &RTN &PARMS)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

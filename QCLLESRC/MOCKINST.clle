@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------- */
-/* MOCKINST - build RPGMOCK into a library                          */
+/* MOCKINST - build IBMIMOCK into a library                         */
 /*                                                                  */
-/*   CALL MOCKINST PARM('RPGMOCK' 'SRCLIB')                         */
+/*   CALL MOCKINST PARM('IBMIMOCK' 'SRCLIB')                        */
 /*   1: library to build into (default: current library)            */
 /*   2: library holding QRPGLESRC, QCLLESRC, QCMDSRC and QSRVSRC    */
 /*      (default: the build library)                                */
@@ -63,8 +63,8 @@
              CRTSRVPGM  SRVPGM(&LIB/MOCKENG) MODULE(QTEMP/MOCKCDC +
                           QTEMP/MOCKENG QTEMP/MOCKGEN) +
                           EXPORT(*SRCFILE) SRCFILE(&SRCLIB/QSRVSRC) +
-                          SRCMBR(MOCKENG) ACTGRP(RPGMOCK) +
-                          TEXT('RPGMOCK engine')
+                          SRCMBR(MOCKENG) ACTGRP(IBMIMOCK) +
+                          TEXT('IBMIMOCK engine')
 
              CHGVAR     VAR(&CPP) VALUE('MCKPGMC')
              CHGVAR     VAR(&CMD) VALUE('MOCKPGM')
@@ -103,7 +103,7 @@
              CHGVAR     VAR(&CMD) VALUE('MOCKCHK')
              CALLSUBR   SUBR(BUILD)
 
-             CHGVAR     VAR(&MSG) VALUE('RPGMOCK installed in' *BCAT +
+             CHGVAR     VAR(&MSG) VALUE('IBMIMOCK installed in' *BCAT +
                           &LIB)
              IF         COND(*NOT &INLIBL) THEN(DO)
              RMVLIBLE   LIB(&LIB)
@@ -153,7 +153,7 @@
              CHGVAR     VAR(&MSGF) VALUE('MOCKMSGF  ' *CAT &LIB)
              DLTMSGF    MSGF(&LIB/MOCKMSGF)
              MONMSG     MSGID(CPF2105)
-             CRTMSGF    MSGF(&LIB/MOCKMSGF) TEXT('RPGMOCK messages')
+             CRTMSGF    MSGF(&LIB/MOCKMSGF) TEXT('IBMIMOCK messages')
              ADDMSGD    MSGID(MCK0001) MSGF(&LIB/MOCKMSGF) MSG('&1') +
                           SECLVL('&1') SEV(0) FMT((*CHAR 512))
              ADDMSGD    MSGID(MCK0010) MSGF(&LIB/MOCKMSGF) MSG('&1') +

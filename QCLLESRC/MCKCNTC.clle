@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKCNTC - RPGMOCK command processing program for MOCKCOUNT       */
+/* MCKCNTC - IBMIMOCK command processing program for MOCKCOUNT      */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &RTNVAL &PROC &ARGS)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

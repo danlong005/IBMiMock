@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKWHNC - RPGMOCK command processing program for MOCKWHEN        */
+/* MCKWHNC - IBMIMOCK command processing program for MOCKWHEN       */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &PROC &ARGS &RTNS &SETS &THROW +
                           &TIMES)

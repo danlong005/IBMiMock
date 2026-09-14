@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCKCDC - RPGMOCK codec: typed buffer <-> text, argument matchers
+// MOCKCDC - IBMIMOCK codec: typed buffer <-> text, argument matchers
 // Module of service program MOCKENG.
 // ------------------------------------------------------------------
 ctl-opt nomain option(*srcstmt:*nodebugio) decprec(63);
@@ -90,7 +90,7 @@ dcl-proc mock_normDef export;
   endsl;
 
   if def.passing = '*VALUE' and def.type = '*VARCHAR';
-    msg = '*VARCHAR cannot be passed *VALUE by RPGMOCK stubs';
+    msg = '*VARCHAR cannot be passed *VALUE by IBMIMOCK stubs';
     return *off;
   endif;
   return *on;

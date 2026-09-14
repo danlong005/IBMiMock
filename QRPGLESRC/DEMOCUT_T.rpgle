@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// DEMOCUT_T - RPGMOCK demo tests for DEMOCUT.
+// DEMOCUT_T - IBMIMOCK demo tests for DEMOCUT.
 // The mocks (DEMODEP *PGM, DEMOSRV *SRVPGM strict) are created by the
 // MOCKDEMO driver; each test stubs and verifies them through MOCK_H.
 // Written with a tiny harness; in RPGUnit the same mock()/mock_ok()

@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCKENG_H - RPGMOCK engine internals (templates + prototypes)
+// MOCKENG_H - IBMIMOCK engine internals (templates + prototypes)
 // Used by the MOCKENG service program modules and its unit tests.
 // Test authors should /copy MOCK_H instead.
 // ------------------------------------------------------------------

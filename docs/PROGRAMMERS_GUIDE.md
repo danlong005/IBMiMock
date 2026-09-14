@@ -1,6 +1,6 @@
-# RPGMOCK Programmer's Guide
+# IBMIMOCK Programmer's Guide
 
-RPGMOCK gives your CL test driver commands that put stand-in objects in QTEMP. The code under test calls those stand-ins instead of the real programs. Your tests then decide what they answer and check how they were called.
+IBMIMOCK gives your CL test driver commands that put stand-in objects in QTEMP. The code under test calls those stand-ins instead of the real programs. Your tests then decide what they answer and check how they were called.
 
 | | |
 |---|---|
@@ -12,7 +12,7 @@ RPGMOCK gives your CL test driver commands that put stand-in objects in QTEMP. T
 ## Contents
 
 1. [The big picture](#1-the-big-picture)
-2. [Installing RPGMOCK](#2-installing-rpgmock)
+2. [Installing IBMIMOCK](#2-installing-ibmimock)
 3. [Four rules](#3-four-rules)
 4. [Your first mocked test](#4-your-first-mocked-test)
 5. [Describing parameters](#5-describing-parameters)
@@ -50,7 +50,7 @@ The order matters: mocks must exist before anything that uses them is activated.
 | Dependency | When IBM i finds it | What the mock needs |
 |---|---|---|
 | `*PGM`, called with `CALLP` + `EXTPGM` or CL `CALL` | At the first call, by searching the library list | QTEMP searched before the library that holds the real program |
-| `*SRVPGM` procedure | When the calling program is activated, from the library saved at bind time | The caller bound through `*LIBL`. RPGMOCK copies the real signatures, so activation accepts the mock. |
+| `*SRVPGM` procedure | When the calling program is activated, from the library saved at bind time | The caller bound through `*LIBL`. IBMIMOCK copies the real signatures, so activation accepts the mock. |
 
 Stubs are stored as rows in QTEMP tables, not compiled into the mock. You create a mock *once* per driver, and each test can change what it answers without recompiling.
 
@@ -64,9 +64,9 @@ Every stub hands the call to `MOCK_INVOKE` in service program `MOCKENG`:
 
 ---
 
-## 2. Installing RPGMOCK
+## 2. Installing IBMIMOCK
 
-RPGMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need RPGUnit, but works well with it.
+IBMIMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need RPGUnit, but works well with it.
 
 ### Build from the repository
 
@@ -81,8 +81,8 @@ RPGMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't nee
    ```
 3. Run it, naming the library to build into and the repository directory:
    ```
-   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock')
-   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')
+   CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock')
+   CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock' '*YES')
    ```
 
 `BUILD` does the following:
@@ -101,17 +101,17 @@ RPGMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't nee
 |---|---|
 | `MOCKPGM` … `MOCKCHK` `*CMD` | The commands |
 | `MCK*C` `*PGM` | Their CL command processing programs |
-| `MOCKENG` `*SRVPGM` (activation group `RPGMOCK`) | Engine: stub runtime, matchers, verification, source generation |
+| `MOCKENG` `*SRVPGM` (activation group `IBMIMOCK`) | Engine: stub runtime, matchers, verification, source generation |
 | `MOCKMSGF` `*MSGF` | `MCKnnnn` messages |
 
-To use RPGMOCK, a test driver needs the library in its library list (anywhere; it holds nothing that gets mocked), and test programs bind service program `MOCKENG`. Copy `MOCK_H` from its `QRPGLESRC` into your tests.
+To use IBMIMOCK, a test driver needs the library in its library list (anywhere; it holds nothing that gets mocked), and test programs bind service program `MOCKENG`. Copy `MOCK_H` from its `QRPGLESRC` into your tests.
 
 ### Rebuild after changing the source
 
 If you edit members in the library (with RDi or SEU, for example), rebuild with:
 
 ```
-CALL RPGMOCK/MOCKINST PARM('RPGMOCK')
+CALL IBMIMOCK/MOCKINST PARM('IBMIMOCK')
 ```
 
 An optional second parameter names a different library holding the four source files.
@@ -123,13 +123,13 @@ An optional second parameter names a different library holding the four source f
 | `MOCKTEST` | `MOCKENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
 | `MOCKDEMO` | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
 
-Run them with `BUILD` and `'*YES'`, or after a build with `CALL RPGMOCK/MOCKTEST PARM('RPGMOCK')` and `CALL RPGMOCK/MOCKDEMO PARM('RPGMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
+Run them with `BUILD` and `'*YES'`, or after a build with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')` and `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
 
 ---
 
 ## 3. Four rules
 
-Almost every "the real program ran anyway" problem breaks one of these rules. RPGMOCK checks the first two for you.
+Almost every "the real program ran anyway" problem breaks one of these rules. IBMIMOCK checks the first two for you.
 
 ### Rule 1: QTEMP must come first
 
@@ -156,7 +156,7 @@ QTEMP belongs to a job. Creating mocks in one SSH session and running tests in a
 
 ## 4. Your first mocked test
 
-The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in the RPGMOCK library (`DEMOCUT`, `DEMODEP`, `DEMOSRV` in `QRPGLESRC`; driver `MOCKDEMO` in `QCLLESRC`). Run `CALL RPGMOCK/MOCKDEMO` to see it pass.
+The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in the IBMIMOCK library (`DEMOCUT`, `DEMODEP`, `DEMOSRV` in `QRPGLESRC`; driver `MOCKDEMO` in `QCLLESRC`). Run `CALL IBMIMOCK/MOCKDEMO` to see it pass.
 
 ### Step 1: Read the code under test
 
@@ -268,7 +268,7 @@ end-proc;
 
 ### Step 5: Run the driver and read the result
 
-Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or with `SBMJOB CMD(CALL MYLIB/ORDERDRV)`. When a verification fails, `assert` reports RPGMOCK's explanation:
+Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or with `SBMJOB CMD(CALL MYLIB/ORDERDRV)`. When a verification fails, `assert` reports IBMIMOCK's explanation:
 
 ```
 Verification failed: expected TAXSRV.CALCTAX to be called exactly 1 time(s)
@@ -280,7 +280,7 @@ Recorded calls: #7('100.00', 'NJ')
 
 ## 5. Describing parameters
 
-RPGMOCK doesn't read prototypes. You describe each parameter as `(type length decimals)`, plus a passing style for service program procedures. Copy the layout straight from the prototype:
+IBMIMOCK doesn't read prototypes. You describe each parameter as `(type length decimals)`, plus a passing style for service program procedures. Copy the layout straight from the prototype:
 
 | RPG declaration | `MOCKPGM PARMS` / `RTNTYPE` | `MOCKPROC PARMS` |
 |---|---|---|
@@ -351,7 +351,7 @@ MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('5.00')                  /* default  *
 MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ NY)) RETURN('8.88') /* override */
 ```
 
-RPGMOCK checks stubs from newest to oldest and uses the first one that matches and has uses left. Define broad stubs first (for example in `SETUP`) and narrow ones in the test.
+IBMIMOCK checks stubs from newest to oldest and uses the first one that matches and has uses left. Define broad stubs first (for example in `SETUP`) and narrow ones in the test.
 
 ### Different answers on successive calls
 
@@ -543,4 +543,4 @@ The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exp
 
 ---
 
-RPGMOCK is developed in the [IBMiMock repository](../README.md). See [Installing RPGMOCK](#2-installing-rpgmock) to build it and run its self-tests.
+IBMIMOCK is developed in the [IBMiMock repository](../README.md). See [Installing IBMIMOCK](#2-installing-ibmimock) to build it and run its self-tests.

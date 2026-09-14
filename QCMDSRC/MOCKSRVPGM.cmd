@@ -1,5 +1,5 @@
-/* MOCKSRVPGM - RPGMOCK: start a *SRVPGM mock (build with MOCKBUILD) */
-             CMD        PROMPT('RPGMOCK - Mock a srvpgm')
+/* MOCKSRVPGM - IBMIMOCK: start a *SRVPGM mock (build with MOCKBUILD) */
+             CMD        PROMPT('IBMIMOCK - Mock a srvpgm')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Service program to mock')
              PARM       KWD(BEHAVIOR) TYPE(*CHAR) LEN(7) RSTD(*YES) +

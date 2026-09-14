@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKSRVC - RPGMOCK command processing program for MOCKSRVPGM      */
+/* MCKSRVC - IBMIMOCK command processing program for MOCKSRVPGM     */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &BEHAVIOR &SRCQ &SRCMBR)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)
@@ -33,7 +33,7 @@
                           VALUE('*NONE'))
 
              CRTSRCPF   FILE(QTEMP/MOCKBND) RCDLEN(240) +
-                          TEXT('RPGMOCK binder source')
+                          TEXT('IBMIMOCK binder source')
              MONMSG     MSGID(CPF7302)
              RMVM       FILE(QTEMP/MOCKBND) MBR(&OBJ)
              MONMSG     MSGID(CPF0000)

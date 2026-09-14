@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKCHKC - RPGMOCK command processing program for MOCKCHK         */
+/* MCKCHKC - IBMIMOCK command processing program for MOCKCHK        */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&PGMQ)
              DCL        VAR(&PGMQ) TYPE(*CHAR) LEN(20)

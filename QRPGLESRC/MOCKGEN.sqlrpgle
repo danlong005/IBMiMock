@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCKGEN - RPGMOCK source generation
+// MOCKGEN - IBMIMOCK source generation
 //   * stub source for *PGM and *SRVPGM mocks -> QTEMP/MOCKSRC(obj)
 //   * export list from binder source         <- QTEMP/MOCKBND(obj)
 // Module of service program MOCKENG.
@@ -193,7 +193,7 @@ dcl-proc mock_genPgm export;
   msg = '';
   srcBegin();
   srcLine('**free');
-  srcLine('// RPGMOCK generated stub for *PGM ' + %trim(obj)
+  srcLine('// IBMIMOCK generated stub for *PGM ' + %trim(obj)
         + ' - do not edit');
   srcLine('ctl-opt option(*srcstmt:*nodebugio);');
   genCommon();
@@ -280,7 +280,7 @@ dcl-proc mock_genSrv export;
 
   srcBegin();
   srcLine('**free');
-  srcLine('// RPGMOCK generated stub for *SRVPGM ' + %trim(obj)
+  srcLine('// IBMIMOCK generated stub for *SRVPGM ' + %trim(obj)
         + ' - do not edit');
   srcLine('ctl-opt nomain option(*srcstmt:*nodebugio);');
   genCommon();
@@ -289,7 +289,7 @@ dcl-proc mock_genSrv export;
   for i = 1 to nProcs;
     if kinds(i) = 'DATA';
       if %len(procs(i)) > 180;
-        msg = 'Export name too long for RPGMOCK: ' + %subst(procs(i):1:60);
+        msg = 'Export name too long for IBMIMOCK: ' + %subst(procs(i):1:60);
         return *off;
       endif;
       srcLine('dcl-s MOCKD' + num5(i) + ' char(' + %char(sizes(i))
@@ -303,7 +303,7 @@ dcl-proc mock_genSrv export;
       iter;
     endif;
     if %len(procs(i)) > 180;
-      msg = 'Export name too long for RPGMOCK: ' + %subst(procs(i):1:60);
+      msg = 'Export name too long for IBMIMOCK: ' + %subst(procs(i):1:60);
       return *off;
     endif;
 

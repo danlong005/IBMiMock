@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKRMVC - RPGMOCK command processing program for MOCKRMV         */
+/* MCKRMVC - IBMIMOCK command processing program for MOCKRMV        */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

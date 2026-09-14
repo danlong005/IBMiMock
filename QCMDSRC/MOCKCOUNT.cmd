@@ -1,5 +1,5 @@
-/* MOCKCOUNT - RPGMOCK: number of recorded calls                     */
-             CMD        PROMPT('RPGMOCK - Count calls')
+/* MOCKCOUNT - IBMIMOCK: number of recorded calls                    */
+             CMD        PROMPT('IBMIMOCK - Count calls')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Mock')
              PARM       KWD(RTNVAL) TYPE(*DEC) LEN(10 0) RTNVAL(*YES) +

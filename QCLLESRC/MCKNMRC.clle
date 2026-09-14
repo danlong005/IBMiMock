@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKNMRC - RPGMOCK command processing program for MOCKNOMORE      */
+/* MCKNMRC - IBMIMOCK command processing program for MOCKNOMORE     */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

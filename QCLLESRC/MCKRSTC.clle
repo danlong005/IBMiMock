@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKRSTC - RPGMOCK command processing program for MOCKRESET       */
+/* MCKRSTC - IBMIMOCK command processing program for MOCKRESET      */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &SCOPE)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

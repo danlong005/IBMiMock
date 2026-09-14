@@ -1,12 +1,12 @@
 /* ---------------------------------------------------------------- */
-/* MOCKDEMO - RPGMOCK end-to-end demo / acceptance test             */
+/* MOCKDEMO - IBMIMOCK end-to-end demo / acceptance test            */
 /*                                                                  */
 /* A typical CL test driver: create mocks in QTEMP, compile the     */
 /* code under test and its tests, run them, verify from CL, clean   */
 /* up. Everything runs in one job because QTEMP belongs to the job. */
 /*                                                                  */
-/*   CALL MOCKDEMO PARM('RPGMOCK' 'SRCLIB')                         */
-/*   1: RPGMOCK library, also used for the demo objects             */
+/*   CALL MOCKDEMO PARM('IBMIMOCK' 'SRCLIB')                        */
+/*   1: IBMIMOCK library, also used for the demo objects            */
 /*      (default: current library)                                  */
 /*   2: library holding the source files (default: parameter 1)     */
 /* ---------------------------------------------------------------- */

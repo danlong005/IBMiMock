@@ -1,8 +1,8 @@
 **free
 // ------------------------------------------------------------------
-// MOCKENG - RPGMOCK engine: mock state (QTEMP tables), stub runtime,
+// MOCKENG - IBMIMOCK engine: mock state (QTEMP tables), stub runtime,
 //           stubbing, verification and the public test API.
-// Module of service program MOCKENG (ACTGRP RPGMOCK).
+// Module of service program MOCKENG (ACTGRP IBMIMOCK).
 // ------------------------------------------------------------------
 ctl-opt nomain option(*srcstmt:*nodebugio) decprec(63);
 
