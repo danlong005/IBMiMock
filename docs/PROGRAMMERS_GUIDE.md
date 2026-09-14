@@ -7,20 +7,21 @@ RPGMOCK gives your CL test driver commands that put stand-in objects in QTEMP. T
 | Commands and engine | `MOCK*` commands, service program `MOCKENG` |
 | Copybook for RPG tests | `MOCK_H` |
 | Requires | IBM i 7.4 or later |
-| Command reference | [`README.md`](../README.md) |
+| Project | [IBMiMock on GitHub](../README.md) |
 
 ## Contents
 
 1. [The big picture](#1-the-big-picture)
-2. [Four rules](#2-four-rules)
-3. [Your first mocked test](#3-your-first-mocked-test)
-4. [Describing parameters](#4-describing-parameters)
-5. [Stubbing recipes](#5-stubbing-recipes)
-6. [Verifying calls](#6-verifying-calls)
-7. [Writing tests in RPG](#7-writing-tests-in-rpg)
-8. [Test isolation](#8-test-isolation)
-9. [Troubleshooting](#9-troubleshooting)
-10. [Quick reference](#10-quick-reference)
+2. [Installing RPGMOCK](#2-installing-rpgmock)
+3. [Four rules](#3-four-rules)
+4. [Your first mocked test](#4-your-first-mocked-test)
+5. [Describing parameters](#5-describing-parameters)
+6. [Stubbing recipes](#6-stubbing-recipes)
+7. [Verifying calls](#7-verifying-calls)
+8. [Writing tests in RPG](#8-writing-tests-in-rpg)
+9. [Test isolation](#9-test-isolation)
+10. [Troubleshooting](#10-troubleshooting)
+11. [Quick reference](#11-quick-reference)
 
 ---
 
@@ -53,15 +54,86 @@ The order matters: mocks must exist before anything that uses them is activated.
 
 Stubs are stored as rows in QTEMP tables, not compiled into the mock. You create a mock *once* per driver, and each test can change what it answers without recompiling.
 
+### What happens on each call
+
+Every stub hands the call to `MOCK_INVOKE` in service program `MOCKENG`:
+
+1. The arguments are recorded in `QTEMP/MOCK_CALL` and `QTEMP/MOCK_CARG`, as they arrived.
+2. The newest `MOCKWHEN` whose argument matchers accept the call, and that still has uses left, is chosen.
+3. Its answer is applied: `SETPARM` writes output parameters, `RETURN` sets the return value, and `THROW` sends an escape message to the caller. With no matching stub, a loose mock does nothing and a strict mock throws.
+
 ---
 
-## 2. Four rules
+## 2. Installing RPGMOCK
+
+RPGMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need RPGUnit, but works well with it.
+
+### Build from the repository
+
+1. Put the repository in the IFS, for example with git in PASE:
+   ```
+   git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
+   ```
+   Or download it and copy the `QRPGLESRC`, `QCLLESRC`, `QCMDSRC` and `QSRVSRC` folders to the IFS.
+2. Compile the build program straight from the IFS:
+   ```
+   CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
+   ```
+3. Run it, naming the library to build into and the repository directory:
+   ```
+   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock')
+   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')
+   ```
+
+`BUILD` does the following:
+
+1. Creates the library if it doesn't exist, plus the source files `QRPGLESRC`, `QCLLESRC`, `QCMDSRC` and `QSRVSRC`.
+2. Copies every file into a member of the same name, using the extension as the source type (`MOCKENG.sqlrpgle` becomes member `MOCKENG`, type `SQLRPGLE`). The copy is logged to `build.log` in the repository directory.
+3. Compiles and runs `MOCKINST`, which builds everything.
+4. With `'*YES'` as the third parameter, also runs the self-tests.
+
+- **Long paths:** a quoted `CALL` parameter is only reliable up to 32 characters. For a longer path, run `CHGCURDIR DIR('/the/long/path/IBMiMock')` and pass `'*CURDIR'`, which is also the default.
+- **Library creation:** `BUILD` creates the library only if you're authorized to `CRTLIB`. Otherwise, build into an existing library.
+
+### What gets built
+
+| Object | Purpose |
+|---|---|
+| `MOCKPGM` … `MOCKCHK` `*CMD` | The commands |
+| `MCK*C` `*PGM` | Their CL command processing programs |
+| `MOCKENG` `*SRVPGM` (activation group `RPGMOCK`) | Engine: stub runtime, matchers, verification, source generation |
+| `MOCKMSGF` `*MSGF` | `MCKnnnn` messages |
+
+To use RPGMOCK, a test driver needs the library in its library list (anywhere; it holds nothing that gets mocked), and test programs bind service program `MOCKENG`. Copy `MOCK_H` from its `QRPGLESRC` into your tests.
+
+### Rebuild after changing the source
+
+If you edit members in the library (with RDi or SEU, for example), rebuild with:
+
+```
+CALL RPGMOCK/MOCKINST PARM('RPGMOCK')
+```
+
+An optional second parameter names a different library holding the four source files.
+
+### Self-tests
+
+| Driver | Tests | What it covers |
+|---|---|---|
+| `MOCKTEST` | `MOCKENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
+| `MOCKDEMO` | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
+
+Run them with `BUILD` and `'*YES'`, or after a build with `CALL RPGMOCK/MOCKTEST PARM('RPGMOCK')` and `CALL RPGMOCK/MOCKDEMO PARM('RPGMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
+
+---
+
+## 3. Four rules
 
 Almost every "the real program ran anyway" problem breaks one of these rules. RPGMOCK checks the first two for you.
 
 ### Rule 1: QTEMP must come first
 
-The system portion, product libraries and **the current library** are searched *before* QTEMP. The repo's compile scripts make your library `*CURLIB`. In a test driver, move it below QTEMP first. Otherwise `MOCKPGM` and `MOCKBUILD` stop with **MCK0010**.
+The system portion, product libraries and **the current library** are searched *before* QTEMP. Build scripts and job descriptions often make the development library `*CURLIB`. In a test driver, move it below QTEMP first. Otherwise `MOCKPGM` and `MOCKBUILD` stop with **MCK0010**.
 
 ```
 CHGCURLIB  CURLIB(*CRTDFT)
@@ -82,7 +154,7 @@ QTEMP belongs to a job. Creating mocks in one SSH session and running tests in a
 
 ---
 
-## 3. Your first mocked test
+## 4. Your first mocked test
 
 The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in the RPGMOCK library (`DEMOCUT`, `DEMODEP`, `DEMOSRV` in `QRPGLESRC`; driver `MOCKDEMO` in `QCLLESRC`). Run `CALL RPGMOCK/MOCKDEMO` to see it pass.
 
@@ -206,7 +278,7 @@ Recorded calls: #7('100.00', 'NJ')
 
 ---
 
-## 4. Describing parameters
+## 5. Describing parameters
 
 RPGMOCK doesn't read prototypes. You describe each parameter as `(type length decimals)`, plus a passing style for service program procedures. Copy the layout straight from the prototype:
 
@@ -232,12 +304,15 @@ RPGMOCK doesn't read prototypes. You describe each parameter as `(type length de
 - **Data structures:** describe a DS parameter as one `*CHAR` of its size. Matching and `SETPARM` then work on the whole record as text, which only makes sense when the subfields are character.
 - **Export names:** `PROC` is matched exactly first, then case-insensitively. RPG exports are uppercase unless the prototype uses `EXTPROC(*DCLCASE)` or a quoted name.
 - **Changed an interface?** Run `MOCKPROC` again, then `MOCKBUILD`. Stubs alone never need a rebuild.
+- **No real service program on the system?** By default `MOCKSRVPGM` reads exports and signatures from the real object (`SRCFILE(*RTV)`). Pass its binder source instead with `SRCFILE(lib/QSRVSRC) SRCMBR(name)`; every `*PRV` block is kept.
 
 ---
 
-## 5. Stubbing recipes
+## 6. Stubbing recipes
 
 Every recipe is a `MOCKWHEN` command. From RPG, wrap it in `mock('…')` and double the quotes. From CL, write it as shown.
+
+Values are checked against the declared layout when `MOCKWHEN` runs, so a mistake such as `RETURN('12345678901.99')` for `*PACKED 11 2` fails right away with **MCK0014** instead of at call time.
 
 ### Return a value
 
@@ -313,7 +388,7 @@ A `*LOOSE` mock (the default) answers an unmatched call by leaving parameters un
 
 ---
 
-## 6. Verifying calls
+## 7. Verifying calls
 
 Every call to a mock is recorded with a snapshot of its arguments as they arrived. Verification checks that record.
 
@@ -359,9 +434,9 @@ Captured values are text: numbers are normalized (`25.50`, `-1`), trailing blank
 
 ---
 
-## 7. Writing tests in RPG
+## 8. Writing tests in RPG
 
-Copy `MOCK_H` into the test module and bind service program `MOCKENG`. Every MOCK command runs through one of two wrappers:
+Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a complete working example, see `QRPGLESRC/DEMOCUT_T` (driven by `QCLLESRC/MOCKDEMO`). Every MOCK command runs through one of two wrappers:
 
 | Procedure | On failure | Use it for |
 |---|---|---|
@@ -381,7 +456,7 @@ Copy `MOCK_H` into the test module and bind service program `MOCKENG`. Every MOC
 
 ---
 
-## 8. Test isolation
+## 9. Test isolation
 
 | Command | Clears | Keeps | When |
 |---|---|---|---|
@@ -397,7 +472,7 @@ Copy `MOCK_H` into the test module and bind service program `MOCKENG`. Every MOC
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting
 
 ### Symptoms
 
@@ -440,22 +515,24 @@ select * from qtemp.mock_sig;                          -- declared layouts
 
 ---
 
-## 10. Quick reference
+## 11. Quick reference
 
-| Command | Key parameters |
-|---|---|
-| `MOCKPGM` | `OBJ` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` |
-| `MOCKSRVPGM` | `OBJ` · `BEHAVIOR` · `SRCFILE(*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` |
-| `MOCKPROC` | `OBJ` · `PROC` · `RTNTYPE(type len dec)` · `PARMS((type len dec\|passing [passing]) …)` |
-| `MOCKBUILD` | `OBJ` |
-| `MOCKWHEN` | `OBJ` · `PROC(*PGM\|name)` · `ARGS((n matcher value) …)` · `RETURN(v …)` · `SETPARM((n value) …)` · `THROW(msgid msgf lib data)` · `TIMES(*ALWAYS\|n)` |
-| `MOCKVERIFY` | `OBJ` · `PROC` · `ARGS` · `TIMES(*ONCE\|*NEVER\|*EXACTLY n\|*ATLEAST n\|*ATMOST n)` |
-| `MOCKNOMORE` | `OBJ(*ALL\|name)` |
-| `MOCKGETARG` | `OBJ` · `PARM(n)` · `RTNVAL(&char256)` · `PROC` · `CALL(*LAST\|*FIRST\|n)` · CL programs only |
-| `MOCKCOUNT` | `OBJ` · `RTNVAL(&dec10)` · `PROC` · `ARGS` · CL programs only |
-| `MOCKRESET` | `OBJ(*ALL\|name)` · `SCOPE(*ALL\|*CALLS\|*STUBS)` |
-| `MOCKRMV` | `OBJ(*ALL\|name)` |
-| `MOCKCHK` | `PGM(*NONE\|lib/name)` |
+The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exportName)`; for program mocks, omit `PROC`.
+
+| Command | Key parameters | Mockito / Moq equivalent |
+|---|---|---|
+| `MOCKPGM` | `OBJ` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` | `mock(X.class)` / `new Mock<X>(behavior)` |
+| `MOCKSRVPGM` | `OBJ` · `BEHAVIOR` · `SRCFILE(*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` | `mock(X.class)` |
+| `MOCKPROC` | `OBJ` · `PROC` · `RTNTYPE(type len dec)` · `PARMS((type len dec\|passing [passing]) …)` | – |
+| `MOCKBUILD` | `OBJ` | – |
+| `MOCKWHEN` | `OBJ` · `PROC(*PGM\|name)` · `ARGS((n matcher value) …)` · `RETURN(v …)` · `SETPARM((n value) …)` · `THROW(msgid msgf lib data)` · `TIMES(*ALWAYS\|n)` | `when().thenReturn()/thenThrow()` / `Setup().Returns()/Callback()/Throws()` |
+| `MOCKVERIFY` | `OBJ` · `PROC` · `ARGS` · `TIMES(*ONCE\|*NEVER\|*EXACTLY n\|*ATLEAST n\|*ATMOST n)` | `verify(m, times(n))` / `Verify(Times)` |
+| `MOCKNOMORE` | `OBJ(*ALL\|name)` | `verifyNoMoreInteractions()` / `VerifyNoOtherCalls()` |
+| `MOCKGETARG` | `OBJ` · `PARM(n)` · `RTNVAL(&char256)` · `PROC` · `CALL(*LAST\|*FIRST\|n)` · CL programs only | `ArgumentCaptor` |
+| `MOCKCOUNT` | `OBJ` · `RTNVAL(&dec10)` · `PROC` · `ARGS` · CL programs only | – |
+| `MOCKRESET` | `OBJ(*ALL\|name)` · `SCOPE(*ALL\|*CALLS\|*STUBS)` | `reset()` / `clearInvocations()` |
+| `MOCKRMV` | `OBJ(*ALL\|name)` | – |
+| `MOCKCHK` | `PGM(*NONE\|lib/name)` | – |
 
 ### Limits
 
@@ -466,4 +543,4 @@ select * from qtemp.mock_sig;                          -- declared layouts
 
 ---
 
-RPGMOCK's source lives in the IBMiMock repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Build it into a library with `QCLLESRC/BUILD` (see *Install* in the README); `CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')` also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
+RPGMOCK is developed in the [IBMiMock repository](../README.md). See [Installing RPGMOCK](#2-installing-rpgmock) to build it and run its self-tests.
