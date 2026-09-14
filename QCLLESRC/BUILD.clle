@@ -1,15 +1,15 @@
 /* ---------------------------------------------------------------- */
-/* BUILD - build iMoq from a copy of the IBMiMock repository        */
+/* BUILD - build iMoq from a copy of the imoq repository            */
 /*                                                                  */
 /* 1. Put the repository in the IFS, for example:                   */
-/*      git clone <repo url> /home/ME/IBMiMock                      */
+/*      git clone <repo url> /home/ME/imoq                          */
 /* 2. Compile this program straight from the IFS:                   */
 /*      CRTBNDCL PGM(QTEMP/BUILD)                                   */
-/*        SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')          */
+/*        SRCSTMF('/home/ME/imoq/QCLLESRC/BUILD.clle')              */
 /* 3. Run it:                                                       */
-/*      CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock')           */
+/*      CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/imoq')               */
 /*    or, for a path longer than 32 characters:                     */
-/*      CHGCURDIR DIR('/a/long/path/to/IBMiMock')                   */
+/*      CHGCURDIR DIR('/a/long/path/to/imoq')                       */
 /*      CALL QTEMP/BUILD PARM('IMOQ' '*CURDIR' '*YES')              */
 /*                                                                  */
 /* Parameters                                                       */
@@ -56,7 +56,7 @@
              MONMSG     MSGID(MCH3601)
              IF         COND(&LIB *EQ ' ') THEN(DO)
              CHGVAR     VAR(&MSG) VALUE('Usage: CALL BUILD PARM(''LIB'' +
-                          ''/ifs/path/IBMiMock''|''*CURDIR'' +
+                          ''/ifs/path/imoq''|''*CURDIR'' +
                           [''*YES''])')
              GOTO       CMDLBL(FAIL2)
              ENDDO

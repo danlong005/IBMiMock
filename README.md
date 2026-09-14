@@ -46,10 +46,10 @@ IMOQRMV
 On the IBM i (IBM i 7.4 or later):
 
 ```
-git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
+git clone https://github.com/danlong005/imoq.git /home/ME/imoq
 
-CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
-CALL     QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
+CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/imoq/QCLLESRC/BUILD.clle')
+CALL     QTEMP/BUILD PARM('IMOQ' '/home/ME/imoq' '*YES')
 ```
 
 `BUILD` creates the library and its source files, copies the repository into

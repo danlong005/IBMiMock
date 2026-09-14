@@ -44,7 +44,7 @@ Build iMoq with the examples. `'*YES'` copies the `examples` folder into the
 library and runs every example once:
 
 ```
-CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
+CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/imoq' '*YES')
 ```
 
 Every example has its own small CL driver named after the example. To run one

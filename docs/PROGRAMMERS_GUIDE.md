@@ -12,7 +12,7 @@ iMoq gives your CL test driver commands that put stand-in objects in QTEMP. The 
 | Copybook for RPG tests | `IMOQ_H` |
 | Requires | IBM i 7.4 or later |
 | Examples | [One short example per feature](EXAMPLES.md) |
-| Project | [IBMiMock on GitHub](../README.md) |
+| Project | [imoq on GitHub](../README.md) |
 
 ## Contents
 
@@ -77,17 +77,17 @@ iMoq needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need R
 
 1. Put the repository in the IFS, for example with git in PASE:
    ```
-   git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
+   git clone https://github.com/danlong005/imoq.git /home/ME/imoq
    ```
    Or download it and copy the `QRPGLESRC`, `QCLLESRC`, `QCMDSRC` and `QSRVSRC` folders to the IFS.
 2. Compile the build program straight from the IFS:
    ```
-   CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
+   CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/imoq/QCLLESRC/BUILD.clle')
    ```
 3. Run it, naming the library to build into and the repository directory:
    ```
-   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock')
-   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
+   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/imoq')
+   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/imoq' '*YES')
    ```
 
 `BUILD` does the following:
@@ -97,7 +97,7 @@ iMoq needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need R
 3. Compiles and runs `IMOQINST`, which builds everything.
 4. With `'*YES'` as the third parameter, also runs the self-tests.
 
-- **Long paths:** a quoted `CALL` parameter is only reliable up to 32 characters. For a longer path, run `CHGCURDIR DIR('/the/long/path/IBMiMock')` and pass `'*CURDIR'`, which is also the default.
+- **Long paths:** a quoted `CALL` parameter is only reliable up to 32 characters. For a longer path, run `CHGCURDIR DIR('/the/long/path/imoq')` and pass `'*CURDIR'`, which is also the default.
 - **Library creation:** `BUILD` creates the library only if you're authorized to `CRTLIB`. Otherwise, build into an existing library.
 
 ### What gets built
@@ -570,4 +570,4 @@ The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exp
 
 ---
 
-iMoq is developed in the [IBMiMock repository](../README.md). See [Installing iMoq](#2-installing-imoq) to build it and run its self-tests.
+iMoq is developed in the [imoq repository](../README.md). See [Installing iMoq](#2-installing-imoq) to build it and run its self-tests.
