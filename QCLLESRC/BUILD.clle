@@ -1,16 +1,16 @@
 /* ---------------------------------------------------------------- */
-/* BUILD - build IBMIMOCK from a copy of the IBMiMock repository   */
+/* BUILD - build iMoq from a copy of the IBMiMock repository        */
 /*                                                                  */
 /* 1. Put the repository in the IFS, for example:                   */
-/*      git clone <repo url> /home/ME/IBMiMock                     */
+/*      git clone <repo url> /home/ME/IBMiMock                      */
 /* 2. Compile this program straight from the IFS:                   */
 /*      CRTBNDCL PGM(QTEMP/BUILD)                                   */
-/*        SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')         */
+/*        SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')          */
 /* 3. Run it:                                                       */
-/*      CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock')      */
+/*      CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock')           */
 /*    or, for a path longer than 32 characters:                     */
-/*      CHGCURDIR DIR('/a/long/path/to/IBMiMock')                  */
-/*      CALL QTEMP/BUILD PARM('IBMIMOCK' '*CURDIR' '*YES')          */
+/*      CHGCURDIR DIR('/a/long/path/to/IBMiMock')                   */
+/*      CALL QTEMP/BUILD PARM('IMOQ' '*CURDIR' '*YES')              */
 /*                                                                  */
 /* Parameters                                                       */
 /*   1  Library to build into. Created if it does not exist.        */
@@ -18,7 +18,7 @@
 /*      A quoted CALL parameter is only reliable up to 32            */
 /*      characters; use CHGCURDIR and *CURDIR for longer paths.      */
 /*   3  *YES also copies the example code from examples/ and runs   */
-/*      the unit tests (MOCKTEST), the demo (MOCKDEMO) and the      */
+/*      the unit tests (IMOQTEST), the demo (IMOQDEMO) and the      */
 /*      feature examples (EXAMPLES). Default *NO. The demo and the  */
 /*      examples change the current library and library list of the */
 /*      job that runs them.                                         */
@@ -27,7 +27,7 @@
 /* QCLLESRC, QCMDSRC and QSRVSRC; copy every file in the matching   */
 /* repository folder (and examples/ folder with *YES) into a        */
 /* member of the same name, the extension becoming the source type; */
-/* compile and run MOCKINST, which builds                           */
+/* compile and run IMOQINST, which builds                           */
 /* the commands, programs, service program and message file.        */
 /* The copy step writes its output to build.log in the directory.   */
 /* ---------------------------------------------------------------- */
@@ -78,7 +78,7 @@
              MONMSG     MSGID(CPF9801) EXEC(DO)
 /* run through QCMDEXC so BUILD compiles for users without CRTLIB   */
              CHGVAR     VAR(&CMD) VALUE('CRTLIB LIB(' *CAT %TRIMR(&LIB) +
-                          *TCAT ') TEXT(''IBMIMOCK mocking framework'')')
+                          *TCAT ') TEXT(''iMoq mocking framework'')')
              CALL       PGM(QCMDEXC) PARM(&CMD 200)
              ENDDO
 
@@ -93,9 +93,9 @@
 
 /* ---- copy the repository folders into source members ----------- */
 /* Each file becomes a member named after the file (upper case)     */
-/* with the extension as source type: MOCKENG.sqlrpgle -> MOCKENG   */
+/* with the extension as source type: IMOQENG.sqlrpgle -> IMOQENG   */
 /* SQLRPGLE. Qshell stops at the first file that fails to copy.     */
-/* The examples (used by MOCKDEMO) are copied only with *YES        */
+/* The examples (used by IMOQDEMO) are copied only with *YES        */
              IF         COND(&RUNTESTS *EQ '*YES') THEN(CHGVAR +
                           VAR(&EXDIRS) VALUE('examples/QRPGLESRC +
                           examples/QCLLESRC examples/QSRVSRC'))
@@ -136,23 +136,26 @@
              MONMSG     MSGID(CPF0000)
 
 /* ---- compile and run the installer ----------------------------- */
-             CHGVAR     VAR(&STEP) VALUE('compiling MOCKINST')
-             CRTBNDCL   PGM(&LIB/MOCKINST) SRCFILE(&LIB/QCLLESRC) +
-                          SRCMBR(MOCKINST) REPLACE(*YES)
-             CHGVAR     VAR(&STEP) VALUE('running MOCKINST')
-             CALL       PGM(&LIB/MOCKINST) PARM(&LIB &LIB)
+             CHGVAR     VAR(&STEP) VALUE('compiling IMOQINST')
+             CRTBNDCL   PGM(&LIB/IMOQINST) SRCFILE(&LIB/QCLLESRC) +
+                          SRCMBR(IMOQINST) REPLACE(*YES)
+             CHGVAR     VAR(&STEP) VALUE('running IMOQINST')
+             CALL       PGM(&LIB/IMOQINST) PARM(&LIB &LIB)
 
 /* ---- optional self-tests --------------------------------------- */
              IF         COND(&RUNTESTS *EQ '*YES') THEN(DO)
-             CHGVAR     VAR(&PGM) VALUE('MOCKTEST')
+             CHGVAR     VAR(&PGM) VALUE('IMOQTEST')
              CALLSUBR   SUBR(RUNTEST)
-             CHGVAR     VAR(&PGM) VALUE('MOCKDEMO')
+             CHGVAR     VAR(&PGM) VALUE('IMOQDEMO')
              CALLSUBR   SUBR(RUNTEST)
-             CHGVAR     VAR(&PGM) VALUE('EXAMPLES')
-             CALLSUBR   SUBR(RUNTEST)
+             CHGVAR     VAR(&STEP) VALUE('compiling EXAMPLES')
+             CRTBNDCL   PGM(&LIB/EXAMPLES) SRCFILE(&LIB/QCLLESRC) +
+                          SRCMBR(EXAMPLES) REPLACE(*YES)
+             CHGVAR     VAR(&STEP) VALUE('running EXAMPLES')
+             CALL       PGM(&LIB/EXAMPLES) PARM(&LIB)
              ENDDO
 
-             CHGVAR     VAR(&MSG) VALUE('IBMIMOCK built in library' +
+             CHGVAR     VAR(&MSG) VALUE('iMoq built in library' +
                           *BCAT &LIB)
              SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&MSG) +
                           MSGTYPE(*COMP)

@@ -1,0 +1,40 @@
+/* ---------------------------------------------------------------- */
+/* EXOMIT - Optional parameters: *OMIT and *NOPASS                  */
+/*                                                                  */
+/* Driver for test program EXOMIT_T.                                */
+/*   CRTBNDCL PGM(IMOQ/EXOMIT) SRCFILE(IMOQ/QCLLESRC)               */
+/*   CALL IMOQ/EXOMIT PARM('IMOQ')                                  */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+
+/* iMoq and the example source are in &LIB                          */
+             CHGCURLIB  CURLIB(&LIB)
+
+/* 1. Create the mock                                               */
+             IMOQSRVPGM OBJ(EXPRICE)
+             IMOQPROC   OBJ(EXPRICE) PROC(EX_DISCOUNT) +
+                          RTNTYPE(*PACKED 7 2) +
+                          PARMS((*PACKED 7 2 *CONST) (*CHAR 10 *CONST))
+             IMOQBUILD  OBJ(EXPRICE)
+
+/* 2. Compile the test program                                      */
+             CRTRPGMOD  MODULE(QTEMP/EXOMIT_T) SRCFILE(&LIB/QRPGLESRC)
+             CRTPGM     PGM(QTEMP/EXOMIT_T) MODULE(QTEMP/EXOMIT_T) +
+                          BNDSRVPGM((*LIBL/EXPRICE) (*LIBL/IMOQENG)) +
+                          ACTGRP(*NEW)
+
+/* 3. Run it. A failed expect() arrives as escape message CPF9898.  */
+             CALL       PGM(QTEMP/EXOMIT_T)
+             MONMSG     MSGID(CPF9898) EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP) MSG(&MSG)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXOMIT +
+                          failed:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             ENDDO
+
+/* 4. Remove the mock                                               */
+             IMOQRMV
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('EXOMIT +
+                          passed') MSGTYPE(*COMP)
+             ENDPGM

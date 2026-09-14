@@ -1,0 +1,45 @@
+**free
+// ------------------------------------------------------------------
+// IMOQ_H - iMoq API for test programs (RPGUnit or plain RPG)
+//
+//   Bind with service program IMOQENG (BNDSRVPGM or a binding dir).
+//
+//   imoq('IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
+//   assert(imoq_ok('IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) +
+//          TIMES(*ONCE)') : imoq_lastError());
+// ------------------------------------------------------------------
+/if defined(IMOQ_H)
+/eof
+/endif
+/define IMOQ_H
+
+// Run any IMOQ* command. Sends escape message IMQ0300 if it fails.
+dcl-pr imoq extproc('IMOQ_RUN');
+  cmd varchar(3000) const;
+end-pr;
+
+// Run any IMOQ* command. Returns *off if it failed (for assertions).
+dcl-pr imoq_ok ind extproc('IMOQ_OK');
+  cmd varchar(3000) const;
+end-pr;
+
+// Text of the last failure (verification message, strict-mock call...)
+dcl-pr imoq_lastError varchar(512) extproc('IMOQ_LASTERROR') end-pr;
+
+// Captured argument as text: callNo 1..n or IMOQ_LAST, parmNo 1..64.
+// Returns *OMIT / *NOTPASSED for missing arguments.
+dcl-pr imoq_arg varchar(1024) extproc('IMOQ_ARG');
+  obj char(10) const;
+  proc varchar(4096) const;
+  callNo int(10) const;
+  parmNo int(10) const;
+end-pr;
+
+// Number of recorded calls (-1 if the mock or procedure is unknown)
+dcl-pr imoq_count int(10) extproc('IMOQ_COUNT');
+  obj char(10) const;
+  proc varchar(4096) const;
+end-pr;
+
+dcl-c IMOQ_LAST -1;
+dcl-c IMOQ_PGM '*PGM';

@@ -1,6 +1,7 @@
-# IBMIMOCK Examples
+# iMoq Examples
 
-The `examples` folder has one short program for each IBMIMOCK feature. This page
+The `examples` folder has one short test program and one small CL driver for
+each iMoq feature. This page
 walks through them in a sensible reading order: what each one teaches, the lines
 that matter, and what to notice.
 
@@ -12,12 +13,13 @@ For the concepts behind the examples, see the
 - [Running the examples](#running-the-examples)
 - [How the examples are set up](#how-the-examples-are-set-up)
 - [Anatomy of an example](#anatomy-of-an-example)
+- [Anatomy of a driver](#anatomy-of-a-driver)
 - Creating mocks and answering calls
   - [EXPGM: mock a program and fill in output parameters](#expgm-mock-a-program-and-fill-in-output-parameters)
   - [EXRETURN: return a value from a service program procedure](#exreturn-return-a-value-from-a-service-program-procedure)
   - [EXMATCH: answer based on the arguments](#exmatch-answer-based-on-the-arguments)
-  - [EXOVERRIDE: a default answer plus a special case](#exoverride-a-default-answer-plus-a-special-case)
-  - [EXSEQUENCE: different answers on successive calls](#exsequence-different-answers-on-successive-calls)
+  - [EXNEWEST: a default answer plus a special case](#exnewest-a-default-answer-plus-a-special-case)
+  - [EXSERIES: different answers on successive calls](#exseries-different-answers-on-successive-calls)
   - [EXTIMES: answer only a limited number of calls](#extimes-answer-only-a-limited-number-of-calls)
   - [EXTHROW: make a dependency fail](#exthrow-make-a-dependency-fail)
   - [EXSTRICT: fail on unexpected calls](#exstrict-fail-on-unexpected-calls)
@@ -25,12 +27,12 @@ For the concepts behind the examples, see the
 - Checking what happened
   - [EXVERIFY: check how often something was called](#exverify-check-how-often-something-was-called)
   - [EXNOMORE: make sure nothing else was called](#exnomore-make-sure-nothing-else-was-called)
-  - [EXCAPTURE: look at the arguments](#excapture-look-at-the-arguments)
-  - [EXFAILMSG: read a failed verification](#exfailmsg-read-a-failed-verification)
+  - [EXCAPT: look at the arguments](#excapt-look-at-the-arguments)
+  - [EXERRMSG: read a failed verification](#exerrmsg-read-a-failed-verification)
 - Test housekeeping
   - [EXRESET: clear calls or stubs between tests](#exreset-clear-calls-or-stubs-between-tests)
   - [EXCL: use the mocks from CL](#excl-use-the-mocks-from-cl)
-  - [EXAMPLES: a complete test driver](#examples-a-complete-test-driver)
+  - [EXAMPLES: run every example](#examples-run-every-example)
 - [The end-to-end demo](#the-end-to-end-demo)
 - [Writing your own test](#writing-your-own-test)
 
@@ -38,34 +40,46 @@ For the concepts behind the examples, see the
 
 ## Running the examples
 
-Build IBMIMOCK with the examples, then run the driver:
+Build iMoq with the examples. `'*YES'` copies the `examples` folder into the
+library and runs every example once:
 
 ```
-CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock' '*YES')
-CALL IBMIMOCK/EXAMPLES PARM('IBMIMOCK')
+CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
 ```
 
-`EXAMPLES` writes one line per example to the job log:
+Every example has its own small CL driver named after the example. To run one
+example:
+
+```
+CRTBNDCL PGM(IMOQ/EXRETURN) SRCFILE(IMOQ/QCLLESRC)
+CALL     IMOQ/EXRETURN PARM('IMOQ')
+```
+
+The driver ends with `EXRETURN passed`, or with an escape message naming the
+expectation that failed, for example `EXRETURN failed: EX_PRICE returns 19.99`.
+
+To run all of them, call `EXAMPLES`, which compiles and calls every driver:
+
+```
+CALL IMOQ/EXAMPLES PARM('IMOQ')
+```
 
 ```
 ok   EXPGM
 ok   EXRETURN
 ...
 ok   EXCL
-ok   MOCKCHK
 EXAMPLES: all examples passed
 ```
 
-When an example fails, the line names the expectation that failed, for example
-`FAIL EXRETURN - EX_PRICE returns 19.99`. `EXAMPLES` changes the current library
-and library list of the job that runs it.
+The drivers make the library the job's current library.
 
 ## How the examples are set up
 
 To keep each example tiny, the examples call three dependencies **directly**
 instead of going through separate code under test. None of these dependencies
-exists as a real object. The driver `EXAMPLES` creates all three as mocks
-before running anything.
+exists as a real object: each example's driver creates the mocks that example
+needs.
 
 | Mock | Type | Plays the part of | Interface |
 |---|---|---|---|
@@ -73,9 +87,11 @@ before running anything.
 | `EXAUDIT` | `*PGM`, strict | Audit trail | `event char(20) const` |
 | `EXPRICE` | `*SRVPGM` | Pricing service | `EX_PRICE(item char(5) const) packed(7:2)`<br>`EX_DISCOUNT(amount packed(7:2) const : code char(10) const options(*nopass:*omit)) packed(7:2)`<br>`EX_LOG(text char(50) const)` |
 
-The prototypes live in
-[`examples/QRPGLESRC/EXAMPLE_H`](../examples/QRPGLESRC/EXAMPLE_H.rpgleinc) as
-`getCustomer`, `writeAudit`, `getPrice`, `getDiscount` and `logMessage`.
+Each example declares the prototypes it calls (`getCustomer`, `writeAudit`,
+`getPrice`, `getDiscount` or `logMessage`) at its top, so everything an example
+uses is in one file. The only shared piece is
+[`EXAMPLE_H`](../examples/QRPGLESRC/EXAMPLE_H.rpgleinc), which holds the
+`expect()` helper.
 
 In a real project, the mocks stand in for programs and service programs that
 already exist. Your tests call your own code, and that code calls the mocks.
@@ -83,36 +99,103 @@ already exist. Your tests call your own code, and that code calls the mocks.
 
 ## Anatomy of an example
 
-Every RPG example is a small linear-main program:
+Every example is a small linear-main test program named `<example>_T`:
 
 ```rpgle
 **free
 ctl-opt main(main);
 
-/copy QTEMP/MOCKINC,MOCK_H          // mock(), mock_ok(), mock_arg() ...
-/copy QTEMP/MOCKINC,EXAMPLE_H       // dependency prototypes + expect()
+/copy QRPGLESRC,IMOQ_H              // imoq(), imoq_ok(), imoq_arg() ...
+
+// The dependency this example calls. It is a mock created by the
+// driver EXRETURN; no real object exists.
+
+// EXPRICE (*SRVPGM), procedure EX_PRICE: price of an item
+dcl-pr getPrice packed(7:2) extproc('EX_PRICE');
+  item char(5) const;
+end-pr;
+
+/copy QRPGLESRC,EXAMPLE_H           // expect()
 
 dcl-proc main;
-  mock('MOCKRESET');                // 1. start clean
+  imoq('IMOQRESET');                // 1. start clean
 
-  mock('MOCKWHEN ...');             // 2. say what the mock should do
+  imoq('IMOQWHEN ...');             // 2. say what the mock should do
 
   // 3. call something and check the result
   expect(getPrice('A0001') = 19.99 : 'EX_PRICE returns 19.99');
 
   // 4. optionally verify the calls
-  expect(mock_ok('MOCKVERIFY ...') : mock_lastError());
+  expect(imoq_ok('IMOQVERIFY ...') : imoq_lastError());
 end-proc;
 ```
 
-- **`mock(cmd)`** runs any MOCK command, and stops the example with MCK0300 if
+- **`imoq(cmd)`** runs any MOCK command, and stops the example with IMQ0300 if
   the command fails.
-- **`mock_ok(cmd)`** runs a MOCK command and returns `*off` if it fails. It suits
+- **`imoq_ok(cmd)`** runs a MOCK command and returns `*off` if it fails. It suits
   verifications.
+- **The prototype is the same one the real code would use.** The example calls
+  `EX_PRICE` normally, and the mock answers.
 - **`expect(condition : description)`** stops the example with that description
-  when the condition is false.
+  when the condition is false. `EXAMPLE_H` must be copied in after the
+  prototypes, because it contains a procedure.
 - **Quoting:** inside an RPG string, every quote that CL needs is doubled:
   `RETURN(''19.99'')`.
+
+## Anatomy of a driver
+
+Each driver does the same four steps. This is `EXRETURN`, with its comment
+header left out:
+
+```
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+
+/* iMoq and the example source are in &LIB                          */
+             CHGCURLIB  CURLIB(&LIB)
+
+/* 1. Create the mock                                               */
+             IMOQSRVPGM OBJ(EXPRICE)
+             IMOQPROC   OBJ(EXPRICE) PROC(EX_PRICE) +
+                          RTNTYPE(*PACKED 7 2) PARMS((*CHAR 5 *CONST))
+             IMOQBUILD  OBJ(EXPRICE)
+
+/* 2. Compile the test program                                      */
+             CRTRPGMOD  MODULE(QTEMP/EXRETURN_T) SRCFILE(&LIB/QRPGLESRC)
+             CRTPGM     PGM(QTEMP/EXRETURN_T) MODULE(QTEMP/EXRETURN_T) +
+                          BNDSRVPGM((*LIBL/EXPRICE) (*LIBL/IMOQENG)) +
+                          ACTGRP(*NEW)
+
+/* 3. Run it. A failed expect() arrives as escape message CPF9898.  */
+             CALL       PGM(QTEMP/EXRETURN_T)
+             MONMSG     MSGID(CPF9898) EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP) MSG(&MSG)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXRETURN +
+                          failed:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             ENDDO
+
+/* 4. Remove the mock                                               */
+             IMOQRMV
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('EXRETURN +
+                          passed') MSGTYPE(*COMP)
+             ENDPGM
+```
+
+What to notice:
+- **Mocks come first.** They exist before the test program is compiled or
+  activated.
+- **Program mocks need one command.** A program mock is only `IMOQPGM`, while a
+  service program mock is `IMOQSRVPGM` + `IMOQPROC` + `IMOQBUILD`.
+- **No real object and no binder source.** By default (`SRCFILE(*NONE)`), the
+  mock exports exactly the procedures declared with `IMOQPROC`, and `IMOQBUILD`
+  generates everything else in QTEMP.
+- **Bind through `*LIBL`.** The test program binds `*LIBL/EXPRICE`, so it
+  activates the mock in QTEMP. It also binds `IMOQENG` for the `IMOQ_H`
+  procedures.
+- **The library can stay the current library here,** because no real `EXPRICE`,
+  `EXCUST` or `EXAUDIT` exists to hide a mock. With real dependencies, put their
+  library after QTEMP, as the [end-to-end demo](#the-end-to-end-demo) does.
 
 ---
 
@@ -120,14 +203,14 @@ end-proc;
 
 ### EXPGM: mock a program and fill in output parameters
 
-[`examples/QRPGLESRC/EXPGM.rpgle`](../examples/QRPGLESRC/EXPGM.rpgle)
+Test program [`EXPGM_T`](../examples/QRPGLESRC/EXPGM_T.rpgle), driver [`EXPGM`](../examples/QCLLESRC/EXPGM.clle)
 
 A program "answers" by writing into the caller's parameters, which is what
 `SETPARM` does.
 
 ```rpgle
-// Driver: MOCKPGM OBJ(EXCUST) PARMS((*CHAR 5) (*CHAR 30) (*IND))
-mock('MOCKWHEN OBJ(EXCUST) +
+// Driver: IMOQPGM OBJ(EXCUST) PARMS((*CHAR 5) (*CHAR 30) (*IND))
+imoq('IMOQWHEN OBJ(EXCUST) +
       SETPARM((2 ''Ada Lovelace'') (3 ''1''))');
 
 getCustomer('C0001' : name : found);
@@ -139,45 +222,47 @@ expect(found : 'found is set by SETPARM');
 What to notice:
 - **Parameters are numbered from 1.** `SETPARM((2 …))` writes the second
   parameter.
-- **Values are text.** They're converted to the type declared on `MOCKPGM
+- **Values are text.** They're converted to the type declared on `IMOQPGM
   PARMS`: `'1'` becomes an indicator that is on.
 - **Program mocks don't need `PROC`.**
 
 ### EXRETURN: return a value from a service program procedure
 
-[`examples/QRPGLESRC/EXRETURN.rpgle`](../examples/QRPGLESRC/EXRETURN.rpgle)
+Test program [`EXRETURN_T`](../examples/QRPGLESRC/EXRETURN_T.rpgle), driver [`EXRETURN`](../examples/QCLLESRC/EXRETURN.clle)
 
 ```rpgle
-// Driver: MOCKSRVPGM OBJ(EXPRICE) SRCFILE(lib/QSRVSRC) SRCMBR(EXPRICE)
-//         MOCKPROC   OBJ(EXPRICE) PROC(EX_PRICE) RTNTYPE(*PACKED 7 2)
+// Driver: IMOQSRVPGM OBJ(EXPRICE)
+//         IMOQPROC   OBJ(EXPRICE) PROC(EX_PRICE) RTNTYPE(*PACKED 7 2)
 //                      PARMS((*CHAR 5 *CONST))
-//         MOCKBUILD  OBJ(EXPRICE)
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''19.99'')');
+//         IMOQBUILD  OBJ(EXPRICE)
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''19.99'')');
 
 expect(getPrice('A0001') = 19.99 : 'EX_PRICE returns 19.99');
 expect(getPrice('B0002') = 19.99 : 'no ARGS, so every call matches');
 ```
 
 What to notice:
-- **Three commands create a service program mock.** `MOCKSRVPGM` reads the
-  exports, `MOCKPROC` describes the procedure, and `MOCKBUILD` creates the
-  object.
+- **Three commands create a service program mock.** `IMOQSRVPGM` starts it,
+  `IMOQPROC` declares the procedure, and `IMOQBUILD` creates the object. Each
+  `IMOQPROC` also adds the procedure as an export, so no real `EXPRICE` or binder
+  source is needed. The end-to-end demo uses `SRCFILE(*RTV)` instead, which copies
+  the exports of a real service program.
 - **`RETURN` needs a return type.** It only works for procedures declared with
   `RTNTYPE`.
 - **Without `ARGS`, a stub matches every call.**
 
 ### EXMATCH: answer based on the arguments
 
-[`examples/QRPGLESRC/EXMATCH.rpgle`](../examples/QRPGLESRC/EXMATCH.rpgle)
+Test program [`EXMATCH_T`](../examples/QRPGLESRC/EXMATCH_T.rpgle), driver [`EXMATCH`](../examples/QCLLESRC/EXMATCH.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
       ARGS((1 *EQ A0001)) RETURN(''1.00'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
       ARGS((1 *LIKE ''B%'')) RETURN(''2.00'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
       ARGS((1 *BLANK)) RETURN(''0.50'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
       ARGS((1 *GT 100)) RETURN(''10.00'')');
 
 expect(getPrice('A0001') = 1.00 : '*EQ A0001');
@@ -195,13 +280,13 @@ What to notice:
 - **Numbers compare as numbers**, so `150.00` is greater than `100`.
 - **A loose mock returns zero or blanks when nothing matches.**
 
-### EXOVERRIDE: a default answer plus a special case
+### EXNEWEST: a default answer plus a special case
 
-[`examples/QRPGLESRC/EXOVERRIDE.rpgle`](../examples/QRPGLESRC/EXOVERRIDE.rpgle)
+Test program [`EXNEWEST_T`](../examples/QRPGLESRC/EXNEWEST_T.rpgle), driver [`EXNEWEST`](../examples/QCLLESRC/EXNEWEST.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''5.00'')');   // default
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''5.00'')');   // default
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
       ARGS((1 *EQ GOLD1)) RETURN(''99.00'')');                 // special case
 
 expect(getPrice('GOLD1') = 99.00 : 'special case wins for GOLD1');
@@ -213,12 +298,12 @@ What to notice:
 - **Typical use:** set general answers in your test setup, and add special cases
   inside individual tests.
 
-### EXSEQUENCE: different answers on successive calls
+### EXSERIES: different answers on successive calls
 
-[`examples/QRPGLESRC/EXSEQUENCE.rpgle`](../examples/QRPGLESRC/EXSEQUENCE.rpgle)
+Test program [`EXSERIES_T`](../examples/QRPGLESRC/EXSERIES_T.rpgle), driver [`EXSERIES`](../examples/QCLLESRC/EXSERIES.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) +
       RETURN(''1.00'' ''2.00'' ''3.00'')');
 
 expect(getPrice('A0001') = 1.00 : 'call 1 returns 1.00');
@@ -234,11 +319,11 @@ What to notice:
 
 ### EXTIMES: answer only a limited number of calls
 
-[`examples/QRPGLESRC/EXTIMES.rpgle`](../examples/QRPGLESRC/EXTIMES.rpgle)
+Test program [`EXTIMES_T`](../examples/QRPGLESRC/EXTIMES_T.rpgle), driver [`EXTIMES`](../examples/QCLLESRC/EXTIMES.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''10.00'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''0.00'') TIMES(2)');
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''10.00'')');
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''0.00'') TIMES(2)');
 
 expect(getPrice('A0001') = 0.00 : 'call 1 is free');
 expect(getPrice('A0001') = 0.00 : 'call 2 is free');
@@ -252,10 +337,10 @@ What to notice:
 
 ### EXTHROW: make a dependency fail
 
-[`examples/QRPGLESRC/EXTHROW.rpgle`](../examples/QRPGLESRC/EXTHROW.rpgle)
+Test program [`EXTHROW_T`](../examples/QRPGLESRC/EXTHROW_T.rpgle), driver [`EXTHROW`](../examples/QCLLESRC/EXTHROW.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXCUST) +
+imoq('IMOQWHEN OBJ(EXCUST) +
       THROW(CPF9898 QCPFMSG *LIBL ''Customer file is locked'')');
 
 monitor;
@@ -272,15 +357,15 @@ What to notice:
   takes one set of parentheses.
 - **The caller gets a normal escape message**, so error handling can be tested
   exactly as it runs in production.
-- **`THROW(*MOCK)`** sends IBMIMOCK's own MCK0101.
+- **`THROW(*MOCK)`** sends iMoq's own IMQ0101.
 
 ### EXSTRICT: fail on unexpected calls
 
-[`examples/QRPGLESRC/EXSTRICT.rpgle`](../examples/QRPGLESRC/EXSTRICT.rpgle)
+Test program [`EXSTRICT_T`](../examples/QRPGLESRC/EXSTRICT_T.rpgle), driver [`EXSTRICT`](../examples/QCLLESRC/EXSTRICT.clle)
 
 ```rpgle
-// Driver: MOCKPGM OBJ(EXAUDIT) PARMS((*CHAR 20)) BEHAVIOR(*STRICT)
-mock('MOCKWHEN OBJ(EXAUDIT) ARGS((1 *EQ LOGIN))');
+// Driver: IMOQPGM OBJ(EXAUDIT) PARMS((*CHAR 20)) BEHAVIOR(*STRICT)
+imoq('IMOQWHEN OBJ(EXAUDIT) ARGS((1 *EQ LOGIN))');
 
 writeAudit('LOGIN');              // allowed
 
@@ -291,37 +376,37 @@ on-error;
 endmon;
 
 expect(rejected : 'DELETE was not expected, so the call fails');
-expect(%scan('Unexpected call to EXAUDIT' : mock_lastError()) > 0
-       : 'mock_lastError() explains the unexpected call');
+expect(%scan('Unexpected call to EXAUDIT' : imoq_lastError()) > 0
+       : 'imoq_lastError() explains the unexpected call');
 ```
 
 What to notice:
-- **A strict mock rejects unmatched calls.** Any call that no `MOCKWHEN` matches
-  gets escape message MCK0100.
-- **A `MOCKWHEN` doesn't need an answer.** Here it only marks `LOGIN` as an
+- **A strict mock rejects unmatched calls.** Any call that no `IMOQWHEN` matches
+  gets escape message IMQ0100.
+- **A `IMOQWHEN` doesn't need an answer.** Here it only marks `LOGIN` as an
   allowed call.
-- **Strictness belongs to the mock object.** Choose it on `MOCKPGM` or
-  `MOCKSRVPGM`.
+- **Strictness belongs to the mock object.** Choose it on `IMOQPGM` or
+  `IMOQSRVPGM`.
 
 ### EXOMIT: optional parameters
 
-[`examples/QRPGLESRC/EXOMIT.rpgle`](../examples/QRPGLESRC/EXOMIT.rpgle)
+Test program [`EXOMIT_T`](../examples/QRPGLESRC/EXOMIT_T.rpgle), driver [`EXOMIT`](../examples/QCLLESRC/EXOMIT.clle)
 
 ```rpgle
 // EX_DISCOUNT's second parameter is options(*nopass:*omit)
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
       ARGS((1 *ANY) (2 *NOTPASSED)) RETURN(''1.00'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
       ARGS((2 *OMIT)) RETURN(''2.00'')');
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_DISCOUNT) +
       ARGS((2 *EQ VIP)) RETURN(''3.00'')');
 
 expect(getDiscount(100) = 1.00 : 'code not passed');
 expect(getDiscount(100 : *omit) = 2.00 : 'code passed as *OMIT');
 expect(getDiscount(100 : 'VIP') = 3.00 : 'code VIP');
 
-expect(mock_arg('EXPRICE' : 'EX_DISCOUNT' : 1 : 2) = '*NOTPASSED' : ...);
-expect(mock_arg('EXPRICE' : 'EX_DISCOUNT' : 2 : 2) = '*OMIT' : ...);
+expect(imoq_arg('EXPRICE' : 'EX_DISCOUNT' : 1 : 2) = '*NOTPASSED' : ...);
+expect(imoq_arg('EXPRICE' : 'EX_DISCOUNT' : 2 : 2) = '*OMIT' : ...);
 ```
 
 What to notice:
@@ -329,7 +414,7 @@ What to notice:
   that was left off the call (`*NOPASS`). `*OMIT` matches one passed as
   `*OMIT`.
 - **`*ANY` matches anything,** including missing parameters.
-- **`mock_arg` reports missing parameters** as `*NOTPASSED` or `*OMIT`.
+- **`imoq_arg` reports missing parameters** as `*NOTPASSED` or `*OMIT`.
 
 ---
 
@@ -337,24 +422,24 @@ What to notice:
 
 ### EXVERIFY: check how often something was called
 
-[`examples/QRPGLESRC/EXVERIFY.rpgle`](../examples/QRPGLESRC/EXVERIFY.rpgle)
+Test program [`EXVERIFY_T`](../examples/QRPGLESRC/EXVERIFY_T.rpgle), driver [`EXVERIFY`](../examples/QCLLESRC/EXVERIFY.clle)
 
 ```rpgle
 logMessage('started');
 logMessage('working');
 logMessage('working');
 
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
-                TIMES(*EXACTLY 3)') : mock_lastError());
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
+                TIMES(*EXACTLY 3)') : imoq_lastError());
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
                 ARGS((1 *EQ ''working'')) TIMES(*EXACTLY 2)')
-       : mock_lastError());
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
+       : imoq_lastError());
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
                 ARGS((1 *EQ ''started'')) TIMES(*ONCE)')
-       : mock_lastError());
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
+       : imoq_lastError());
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_LOG) +
                 ARGS((1 *EQ ''stopped'')) TIMES(*NEVER)')
-       : mock_lastError());
+       : imoq_lastError());
 ```
 
 What to notice:
@@ -362,33 +447,33 @@ What to notice:
   `*ATMOST n`. The default is `*EXACTLY 1`.
 - **Add `ARGS` to count only the matching calls.**
 - **Quote mixed-case values.** An unquoted `working` would be uppercased by CL.
-- **Pass `mock_lastError()` as the assertion message** so a failure explains
+- **Pass `imoq_lastError()` as the assertion message** so a failure explains
   itself.
 
 ### EXNOMORE: make sure nothing else was called
 
-[`examples/QRPGLESRC/EXNOMORE.rpgle`](../examples/QRPGLESRC/EXNOMORE.rpgle)
+Test program [`EXNOMORE_T`](../examples/QRPGLESRC/EXNOMORE_T.rpgle), driver [`EXNOMORE`](../examples/QCLLESRC/EXNOMORE.clle)
 
 ```rpgle
 logMessage('hello');
 getPrice('A0001');
 
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_LOG)') : mock_lastError());
-expect(not mock_ok('MOCKNOMORE') : 'the EX_PRICE call is not verified yet');
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_LOG)') : imoq_lastError());
+expect(not imoq_ok('IMOQNOMORE') : 'the EX_PRICE call is not verified yet');
 
-expect(mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_PRICE)') : mock_lastError());
-expect(mock_ok('MOCKNOMORE') : 'every call is now verified');
+expect(imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_PRICE)') : imoq_lastError());
+expect(imoq_ok('IMOQNOMORE') : 'every call is now verified');
 ```
 
 What to notice:
-- **A successful `MOCKVERIFY` marks its matching calls as verified.**
-- **`MOCKNOMORE` catches surprise calls.** It fails while any recorded call is
+- **A successful `IMOQVERIFY` marks its matching calls as verified.**
+- **`IMOQNOMORE` catches surprise calls.** It fails while any recorded call is
   still unverified.
 - **Limit it with `OBJ(name)`** to check just one mock.
 
-### EXCAPTURE: look at the arguments
+### EXCAPT: look at the arguments
 
-[`examples/QRPGLESRC/EXCAPTURE.rpgle`](../examples/QRPGLESRC/EXCAPTURE.rpgle)
+Test program [`EXCAPT_T`](../examples/QRPGLESRC/EXCAPT_T.rpgle), driver [`EXCAPT`](../examples/QCLLESRC/EXCAPT.clle)
 
 ```rpgle
 getPrice('A0001');
@@ -396,33 +481,33 @@ getPrice('B0002');
 getDiscount(250.00 : 'SPRING');
 getCustomer('C0042' : name : found);
 
-expect(mock_count('EXPRICE' : 'EX_PRICE') = 2 : 'EX_PRICE called twice');
-expect(mock_arg('EXPRICE' : 'EX_PRICE' : 1 : 1) = 'A0001' : ...);
-expect(mock_arg('EXPRICE' : 'EX_PRICE' : MOCK_LAST : 1) = 'B0002' : ...);
-expect(mock_arg('EXPRICE' : 'EX_DISCOUNT' : MOCK_LAST : 1) = '250.00' : ...);
-expect(mock_arg('EXCUST' : MOCK_PGM : MOCK_LAST : 1) = 'C0042' : ...);
+expect(imoq_count('EXPRICE' : 'EX_PRICE') = 2 : 'EX_PRICE called twice');
+expect(imoq_arg('EXPRICE' : 'EX_PRICE' : 1 : 1) = 'A0001' : ...);
+expect(imoq_arg('EXPRICE' : 'EX_PRICE' : IMOQ_LAST : 1) = 'B0002' : ...);
+expect(imoq_arg('EXPRICE' : 'EX_DISCOUNT' : IMOQ_LAST : 1) = '250.00' : ...);
+expect(imoq_arg('EXCUST' : IMOQ_PGM : IMOQ_LAST : 1) = 'C0042' : ...);
 ```
 
 What to notice:
-- **The call is `mock_arg(mock : procedure : call number : parameter number)`.**
-- **`MOCK_LAST` picks the most recent call**, and `MOCK_PGM` is the procedure
+- **The call is `imoq_arg(mock : procedure : call number : parameter number)`.**
+- **`IMOQ_LAST` picks the most recent call**, and `IMOQ_PGM` is the procedure
   name for program mocks.
 - **Values come back as text:** numbers formatted like `250.00`, trailing blanks
   removed.
 - **Capture when a matcher can't express the check,** such as a value computed
   by the code under test.
 
-### EXFAILMSG: read a failed verification
+### EXERRMSG: read a failed verification
 
-[`examples/QRPGLESRC/EXFAILMSG.rpgle`](../examples/QRPGLESRC/EXFAILMSG.rpgle)
+Test program [`EXERRMSG_T`](../examples/QRPGLESRC/EXERRMSG_T.rpgle), driver [`EXERRMSG`](../examples/QCLLESRC/EXERRMSG.clle)
 
 ```rpgle
 getPrice('A0001');
 
-expect(not mock_ok('MOCKVERIFY OBJ(EXPRICE) PROC(EX_PRICE) +
+expect(not imoq_ok('IMOQVERIFY OBJ(EXPRICE) PROC(EX_PRICE) +
                     ARGS((1 *EQ B0002))') : 'verification fails');
 
-message = mock_lastError();
+message = imoq_lastError();
 ```
 
 `message` now contains:
@@ -435,8 +520,8 @@ with (1 *EQ 'B0002') but it matched 0 time(s). Recorded calls: #1('A0001')
 What to notice:
 - **The message lists the calls that really happened**, which is usually all
   you need to spot the bug.
-- **`mock()` sends an escape message instead.** It fails with MCK0300, so use
-  `mock()` for setup and `mock_ok()` for checks.
+- **`imoq()` sends an escape message instead.** It fails with IMQ0300, so use
+  `imoq()` for setup and `imoq_ok()` for checks.
 
 ---
 
@@ -444,97 +529,58 @@ What to notice:
 
 ### EXRESET: clear calls or stubs between tests
 
-[`examples/QRPGLESRC/EXRESET.rpgle`](../examples/QRPGLESRC/EXRESET.rpgle)
+Test program [`EXRESET_T`](../examples/QRPGLESRC/EXRESET_T.rpgle), driver [`EXRESET`](../examples/QCLLESRC/EXRESET.clle)
 
 ```rpgle
-mock('MOCKWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''7.00'')');
+imoq('IMOQWHEN OBJ(EXPRICE) PROC(EX_PRICE) RETURN(''7.00'')');
 getPrice('A0001');
 
-mock('MOCKRESET OBJ(EXPRICE) SCOPE(*CALLS)');     // forget calls, keep stub
-expect(mock_count('EXPRICE' : 'EX_PRICE') = 0 : 'calls cleared');
+imoq('IMOQRESET OBJ(EXPRICE) SCOPE(*CALLS)');     // forget calls, keep stub
+expect(imoq_count('EXPRICE' : 'EX_PRICE') = 0 : 'calls cleared');
 expect(getPrice('A0001') = 7.00 : 'stub still answers');
 
-mock('MOCKRESET OBJ(EXPRICE) SCOPE(*STUBS)');     // forget stub, keep calls
+imoq('IMOQRESET OBJ(EXPRICE) SCOPE(*STUBS)');     // forget stub, keep calls
 expect(getPrice('A0001') = 0 : 'no stub left, loose mock returns zero');
-expect(mock_count('EXPRICE' : 'EX_PRICE') = 2 : 'calls were kept');
+expect(imoq_count('EXPRICE' : 'EX_PRICE') = 2 : 'calls were kept');
 ```
 
 What to notice:
-- **`MOCKRESET` with no parameters clears everything for every mock.** Put it
+- **`IMOQRESET` with no parameters clears everything for every mock.** Put it
   in your test setup.
-- **`MOCKRESET` never deletes mock objects**, so there's nothing to rebuild.
-  `MOCKRMV` is the command that removes mocks.
+- **`IMOQRESET` never deletes mock objects**, so there's nothing to rebuild.
+  `IMOQRMV` is the command that removes mocks.
 
 ### EXCL: use the mocks from CL
 
-[`examples/QCLLESRC/EXCL.clle`](../examples/QCLLESRC/EXCL.clle)
+Driver and example in one: [`EXCL`](../examples/QCLLESRC/EXCL.clle)
 
 ```
-MOCKWHEN   OBJ(EXCUST) ARGS((1 *EQ C0042)) +
+IMOQWHEN   OBJ(EXCUST) ARGS((1 *EQ C0042)) +
              SETPARM((2 'Grace Hopper') (3 '1'))
 CALL       PGM(EXCUST) PARM('C0042' &NAME &FOUND)
 
-MOCKCOUNT  OBJ(EXCUST) RTNVAL(&COUNT)             /* &COUNT *DEC 10 0 */
-MOCKGETARG OBJ(EXCUST) PARM(1) CALL(*LAST) RTNVAL(&ARG)   /* *CHAR 256 */
+IMOQCOUNT  OBJ(EXCUST) RTNVAL(&COUNT)             /* &COUNT *DEC 10 0 */
+IMOQGETARG OBJ(EXCUST) PARM(1) CALL(*LAST) RTNVAL(&ARG)   /* *CHAR 256 */
 
-MOCKVERIFY OBJ(EXCUST) ARGS((1 *EQ C0042)) TIMES(*ONCE)
-MOCKVERIFY OBJ(EXCUST) TIMES(*NEVER)
-MONMSG     MSGID(MCK0200) EXEC(CHGVAR VAR(&FAILED) VALUE('1'))
+IMOQVERIFY OBJ(EXCUST) ARGS((1 *EQ C0042)) TIMES(*ONCE)
+IMOQVERIFY OBJ(EXCUST) TIMES(*NEVER)
+MONMSG     MSGID(IMQ0200) EXEC(CHGVAR VAR(&FAILED) VALUE('1'))
 ```
 
 What to notice:
+- **One program does it all:** it creates the mock, stubs, calls, verifies and
+  removes the mock.
 - **The same commands work in CL,** without the doubled quotes.
-- **`MOCKCOUNT` and `MOCKGETARG` only work in CL programs,** because they return
-  values into CL variables. RPG uses `mock_count` and `mock_arg`.
-- **A failed `MOCKVERIFY` sends MCK0200,** which CL can monitor.
+- **`IMOQCOUNT` and `IMOQGETARG` only work in CL programs,** because they return
+  values into CL variables. RPG uses `imoq_count` and `imoq_arg`.
+- **A failed `IMOQVERIFY` sends IMQ0200,** which CL can monitor.
 
-### EXAMPLES: a complete test driver
+### EXAMPLES: run every example
 
-[`examples/QCLLESRC/EXAMPLES.clle`](../examples/QCLLESRC/EXAMPLES.clle)
+[`EXAMPLES`](../examples/QCLLESRC/EXAMPLES.clle)
 
-The driver is a template for your own test drivers:
-
-```
-/* 1. The library must come after QTEMP */
-CHGCURLIB  CURLIB(*CRTDFT)
-RMVLIBLE   LIB(&LIB)
-MONMSG     MSGID(CPF2104)
-ADDLIBLE   LIB(&LIB) POSITION(*LAST)
-
-/* 2. Create the mocks before anything uses them */
-MOCKPGM    OBJ(EXCUST) PARMS((*CHAR 5) (*CHAR 30) (*IND))
-MOCKPGM    OBJ(EXAUDIT) PARMS((*CHAR 20)) BEHAVIOR(*STRICT)
-MOCKSRVPGM OBJ(EXPRICE) SRCFILE(&SRCLIB/QSRVSRC) SRCMBR(EXPRICE)
-MOCKPROC   OBJ(EXPRICE) PROC(EX_PRICE) RTNTYPE(*PACKED 7 2) +
-             PARMS((*CHAR 5 *CONST))
-MOCKPROC   OBJ(EXPRICE) PROC(EX_DISCOUNT) RTNTYPE(*PACKED 7 2) +
-             PARMS((*PACKED 7 2 *CONST) (*CHAR 10 *CONST))
-MOCKPROC   OBJ(EXPRICE) PROC(EX_LOG) PARMS((*CHAR 50 *CONST))
-MOCKBUILD  OBJ(EXPRICE)
-
-/* 3. Compile and run the tests, binding through *LIBL */
-CRTRPGMOD  MODULE(QTEMP/&EX) SRCFILE(&SRCLIB/QRPGLESRC) SRCMBR(&EX)
-CRTPGM     PGM(&LIB/&EX) MODULE(QTEMP/&EX) +
-             BNDSRVPGM((*LIBL/EXPRICE) (&LIB/MOCKENG)) ACTGRP(*NEW)
-CALL       PGM(&LIB/&EX)
-MOCKCHK    PGM(&LIB/EXRETURN)
-
-/* 4. Remove the mocks */
-MOCKRMV
-```
-
-What to notice:
-- **Library list:** the current library is searched before QTEMP, so the
-  driver moves the library behind QTEMP first.
-- **Mocks come first.** They exist before any test program is compiled or
-  activated.
-- **`MOCKSRVPGM SRCFILE/SRCMBR` needs no real object.** It builds a service
-  program mock from binder source, for a service program that doesn't exist
-  yet.
-- **Bind through `*LIBL`.** Test programs bind `*LIBL/EXPRICE`, so they
-  activate the QTEMP mock. They also bind `MOCKENG` for the `MOCK_H`
-  procedures.
-- **`MOCKCHK` finds problems early,** confirming nothing bypasses the mocks.
+`EXAMPLES` compiles each driver, calls it, and writes `ok` or `FAIL` to the job
+log. It's a plain list of `CALL`s, and it's the place to add a new example.
 
 ---
 
@@ -551,18 +597,20 @@ with mocks and test `DEMOCUT` itself.
 | [`DEMODEP`](../examples/QRPGLESRC/DEMODEP.rpgle) | Real customer lookup program, mocked in the tests |
 | [`DEMOSRV`](../examples/QRPGLESRC/DEMOSRV.rpgle) | Real tax service program, mocked strict in the tests |
 | [`DEMOCUT_T`](../examples/QRPGLESRC/DEMOCUT_T.rpgle) | Tests for `DEMOCUT` |
-| [`MOCKDEMO`](../examples/QCLLESRC/MOCKDEMO.clle) | Driver: builds the real objects, creates the mocks, runs the tests, checks library list and binding problems, cleans up |
+| [`IMOQDEMO`](../examples/QCLLESRC/IMOQDEMO.clle) | Driver: builds the real objects, creates the mocks, runs the tests, checks library list and binding problems, cleans up |
 
-Run it with `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')`. The
+Run it with `CALL IMOQ/IMOQDEMO PARM('IMOQ')`. The
 [Programmer's Guide](PROGRAMMERS_GUIDE.md#4-your-first-mocked-test) walks
 through the same scenario step by step.
 
 ## Writing your own test
 
-1. **Driver:** copy `EXAMPLES`. Replace its `MOCKPGM`/`MOCKSRVPGM` commands with
-   your real dependencies, and its compile steps with your code under test and
-   test programs.
-2. **Test program:** copy the example closest to what you need. Replace the
-   `EXAMPLE_H` prototypes with your own code's prototypes, and `expect()` with
-   your test framework's assertions (for example RPGUnit's `assert`).
-3. **Keep the order:** reset → stub → call → assert → verify.
+1. **Pick an example.** Choose the one closest to what you need, and copy both
+   its driver and its `_T` test program.
+2. **Driver:** replace the mock commands with mocks of your real dependencies,
+   and bind your code under test into the test program. If those dependencies
+   exist in your library, put that library after QTEMP first (see `IMOQDEMO`).
+3. **Test program:** replace the example's prototypes with your own code's
+   prototypes, and `expect()` with your test framework's assertions (for example
+   RPGUnit's `assert`).
+4. **Keep the order:** reset → stub → call → assert → verify.

@@ -1,0 +1,119 @@
+/* ---------------------------------------------------------------- */
+/* IMQSRVC - iMoq command processing program for IMOQSRVPGM         */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&OBJ &BEHAVIOR &SRCQ &SRCMBR &SIG +
+                          &MOCKLIB)
+             DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&BEHAVIOR) TYPE(*CHAR) LEN(7)
+             DCL        VAR(&SRCQ) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&SRCFILE) TYPE(*CHAR) LEN(10) +
+                          STG(*DEFINED) DEFVAR(&SRCQ 1)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10) +
+                          STG(*DEFINED) DEFVAR(&SRCQ 11)
+             DCL        VAR(&SRCMBR) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SIG) TYPE(*CHAR) LEN(16)
+             DCL        VAR(&MOCKLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&TEXT) TYPE(*CHAR) LEN(50)
+             DCL        VAR(&OBJTYPE) TYPE(*CHAR) LEN(10) +
+                          VALUE('*SRVPGM')
+             DCL        VAR(&REALLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&ERR) TYPE(*CHAR) LEN(529)
+             DCL        VAR(&ERRID) TYPE(*CHAR) LEN(7) STG(*DEFINED) +
+                          DEFVAR(&ERR 1)
+             DCL        VAR(&ERRLIB) TYPE(*CHAR) LEN(10) STG(*DEFINED) +
+                          DEFVAR(&ERR 8)
+             DCL        VAR(&ERRTXT) TYPE(*CHAR) LEN(512) STG(*DEFINED) +
+                          DEFVAR(&ERR 18)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&CLMSGID) TYPE(*CHAR) LEN(7)
+
+             MONMSG     MSGID(CPF0000 MCH0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CHGVAR     VAR(&CLMSGID) VALUE(' ')
+             CALLSUBR   SUBR(DLTMOCK)
+             IF         COND(&CLMSGID *NE ' ') THEN(GOTO CMDLBL(CLERR))
+             CHGVAR     VAR(&REALLIB) VALUE('*NONE')
+             RTVOBJD    OBJ(*LIBL/&OBJ) OBJTYPE(*SRVPGM) +
+                          RTNLIB(&REALLIB)
+             MONMSG     MSGID(CPF9800) EXEC(CHGVAR VAR(&REALLIB) +
+                          VALUE('*NONE'))
+
+             CRTSRCPF   FILE(QTEMP/IMOQBND) RCDLEN(240) +
+                          TEXT('iMoq binder source')
+             MONMSG     MSGID(CPF7302)
+             RMVM       FILE(QTEMP/IMOQBND) MBR(&OBJ)
+             MONMSG     MSGID(CPF0000)
+
+             IF         COND(&SRCFILE *EQ '*RTV') THEN(DO)
+             IF         COND(&REALLIB *EQ '*NONE') THEN(DO)
+             CHGVAR     VAR(&MSG) VALUE('Service program' *BCAT &OBJ +
+                          *BCAT 'was not found in the library list, +
+                          so its exports cannot be retrieved. Add +
+                          its library, or use SRCFILE(*NONE) and +
+                          declare its procedures with IMOQPROC.')
+             CHGVAR     VAR(&CLMSGID) VALUE('IMQ0013')
+             GOTO       CMDLBL(CLERR)
+             ENDDO
+             RTVBNDSRC  SRVPGM(&REALLIB/&OBJ) SRCFILE(QTEMP/IMOQBND) +
+                          SRCMBR(&OBJ) MBROPT(*REPLACE)
+             ENDDO
+             ELSE       CMD(IF COND(&SRCFILE *NE '*NONE') THEN(DO))
+             IF         COND(&SRCMBR *EQ '*OBJ') THEN(CHGVAR +
+                          VAR(&SRCMBR) VALUE(&OBJ))
+             CPYSRCF    FROMFILE(&SRCLIB/&SRCFILE) TOFILE(QTEMP/IMOQBND) +
+                          FROMMBR(&SRCMBR) TOMBR(&OBJ) MBROPT(*REPLACE)
+             ENDDO
+
+             CALLPRC    PRC('IMOQ_CL_DEFSRV') PARM((&OBJ) (&BEHAVIOR) +
+                          (&REALLIB) (&MOCKLIB) (&SRCFILE) (&SIG) +
+                          (&ERR))
+             IF         COND(&ERRID *NE ' ') THEN(GOTO CMDLBL(MOCKERR))
+             CHGVAR     VAR(&MSG) VALUE('Service program mock' *BCAT +
+                          &OBJ *BCAT 'started:' *BCAT &ERRTXT *TCAT +
+                          '. Declare procedures with IMOQPROC, then +
+                          run IMOQBUILD.')
+             SNDPGMMSG  MSGID(IMQ0001) MSGF(&ERRLIB/IMOQMSGF) +
+                          MSGDTA(&MSG) MSGTYPE(*COMP)
+             RETURN
+
+/* ---- error exits ------------------------------------------------ */
+ MOCKERR:    SNDPGMMSG  MSGID(&ERRID) MSGF(&ERRLIB/IMOQMSGF) +
+                          MSGDTA(&ERRTXT) MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             RETURN
+
+ CLERR:      CALLPRC    PRC('IMOQ_CL_FAIL') PARM((&CLMSGID) (&MSG) (&ERR))
+             MONMSG     MSGID(CPF0000 MCH0000)
+             SNDPGMMSG  MSGID(&CLMSGID) MSGF(&ERRLIB/IMOQMSGF) MSGDTA(&MSG) +
+                          MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000) EXEC(SNDPGMMSG MSGID(CPF9898) +
+                          MSGF(QCPFMSG) MSGDTA(&MSG) MSGTYPE(*ESCAPE))
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*YES) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(&CLMSGID) VALUE('IMQ0015')
+             GOTO       CMDLBL(CLERR)
+/* ---- delete an earlier mock; never replace a real object ------- */
+             SUBR       SUBR(DLTMOCK)
+             CHGVAR     VAR(&TEXT) VALUE('*NOTFOUND')
+             RTVOBJD    OBJ(&MOCKLIB/&OBJ) OBJTYPE(&OBJTYPE) TEXT(&TEXT)
+             MONMSG     MSGID(CPF9800) EXEC(CHGVAR VAR(&TEXT) +
+                          VALUE('*NOTFOUND'))
+             IF         COND(&TEXT *EQ '*NOTFOUND') THEN(RTNSUBR)
+             IF         COND(&MOCKLIB *NE 'QTEMP' *AND &TEXT *NE +
+                          'iMoq mock') THEN(DO)
+             CHGVAR     VAR(&MSG) VALUE(&MOCKLIB *TCAT '/' *TCAT &OBJ +
+                          *BCAT 'already exists and is not an +
+                          iMoq mock, so it will not be replaced. +
+                          Create the mock in another library with +
+                          LIB().')
+             CHGVAR     VAR(&CLMSGID) VALUE('IMQ0016')
+             RTNSUBR
+             ENDDO
+             IF         COND(&OBJTYPE *EQ '*PGM') THEN(DLTPGM +
+                          PGM(&MOCKLIB/&OBJ))
+             ELSE       CMD(DLTSRVPGM SRVPGM(&MOCKLIB/&OBJ))
+             ENDSUBR
+             ENDPGM

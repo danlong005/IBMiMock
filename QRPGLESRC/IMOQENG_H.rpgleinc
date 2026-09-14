@@ -1,0 +1,125 @@
+**free
+// ------------------------------------------------------------------
+// IMOQENG_H - iMoq engine internals (templates + prototypes)
+// Used by the IMOQENG service program modules and its unit tests.
+// Test authors should /copy IMOQ_H instead.
+// ------------------------------------------------------------------
+/if defined(IMOQENG_H)
+/eof
+/endif
+/define IMOQENG_H
+
+dcl-c IMOQ_MAXP 64;
+
+// Parameter / return value layout
+dcl-ds imoq_def_t qualified template;
+  type char(10);
+  len int(10);
+  dec int(10);
+  passing char(6);
+end-ds;
+
+// Error returned to the CL command processing programs
+dcl-ds imoq_err_t qualified template;
+  msgId char(7);
+  msgfLib char(10);
+  text char(512);
+end-ds;
+
+// Escape message a stub must send to its caller
+dcl-ds imoq_throw_t qualified template;
+  msgId char(7);
+  msgf char(10);
+  msgfLib char(10);
+  msgDta varchar(512);
+end-ds;
+
+// ---- Stub entry point (called by generated stubs) ----------------
+dcl-pr imoq_invoke int(10) extproc('IMOQ_INVOKE');
+  obj char(10) const;
+  proc varchar(4096) const;
+  parmCount int(10) value;
+  parmPtrs pointer value;
+  rtnPtr pointer value;
+  thr likeds(imoq_throw_t);
+end-pr;
+
+// ---- Codec (IMOQCDC) ---------------------------------------------
+dcl-pr imoq_normDef ind extproc('IMOQ_NORMDEF');
+  def likeds(imoq_def_t);
+  msg varchar(256);
+end-pr;
+
+dcl-pr imoq_decode varchar(1024) extproc('IMOQ_DECODE');
+  ptr pointer value;
+  def likeds(imoq_def_t) const;
+end-pr;
+
+dcl-pr imoq_encode ind extproc('IMOQ_ENCODE');
+  ptr pointer value;
+  def likeds(imoq_def_t) const;
+  text varchar(1024) const;
+  msg varchar(256);
+end-pr;
+
+dcl-pr imoq_match ind extproc('IMOQ_MATCH');
+  matcher char(10) const;
+  expected varchar(1024) const;
+  state char(1) const;
+  actual varchar(1024) const;
+  def likeds(imoq_def_t) const;
+end-pr;
+
+dcl-pr imoq_isNumeric ind extproc('IMOQ_ISNUMERIC');
+  type char(10) const;
+end-pr;
+
+dcl-pr imoq_rpgType varchar(64) extproc('IMOQ_RPGTYPE');
+  def likeds(imoq_def_t) const;
+end-pr;
+
+dcl-pr imoq_validMatcher ind extproc('IMOQ_VALIDMATCHER');
+  matcher char(10) const;
+end-pr;
+
+// ---- Source generation (IMOQGEN) ---------------------------------
+dcl-pr imoq_genPgm ind extproc('IMOQ_GENPGM');
+  obj char(10) const;
+  parmCount int(10) value;
+  msg varchar(512);
+end-pr;
+
+dcl-pr imoq_genSrv ind extproc('IMOQ_GENSRV');
+  obj char(10) const;
+  msg varchar(512);
+end-pr;
+
+dcl-pr imoq_readExports ind extproc('IMOQ_READEXPORTS');
+  obj char(10) const;
+  names varchar(4096) dim(2000);
+  count int(10);
+  msg varchar(512);
+end-pr;
+
+// ---- Public API for test programs (also in IMOQ_H) ---------------
+dcl-pr imoq_run extproc('IMOQ_RUN');
+  cmd varchar(3000) const;
+end-pr;
+
+dcl-pr imoq_ok ind extproc('IMOQ_OK');
+  cmd varchar(3000) const;
+end-pr;
+
+dcl-pr imoq_lastError varchar(512) extproc('IMOQ_LASTERROR') end-pr;
+
+dcl-pr imoq_arg varchar(1024) extproc('IMOQ_ARG');
+  obj char(10) const;
+  proc varchar(4096) const;
+  callNo int(10) const;
+  parmNo int(10) const;
+end-pr;
+
+dcl-pr imoq_count int(10) extproc('IMOQ_COUNT');
+  obj char(10) const;
+  proc varchar(4096) const;
+end-pr;

@@ -1,0 +1,36 @@
+/* ---------------------------------------------------------------- */
+/* EXSTRICT - Fail on any call you did not expect                   */
+/*                                                                  */
+/* Driver for test program EXSTRICT_T.                              */
+/*   CRTBNDCL PGM(IMOQ/EXSTRICT) SRCFILE(IMOQ/QCLLESRC)             */
+/*   CALL IMOQ/EXSTRICT PARM('IMOQ')                                */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+
+/* iMoq and the example source are in &LIB                          */
+             CHGCURLIB  CURLIB(&LIB)
+
+/* 1. Create the mock                                               */
+             IMOQPGM    OBJ(EXAUDIT) PARMS((*CHAR 20)) BEHAVIOR(*STRICT)
+
+/* 2. Compile the test program                                      */
+             CRTRPGMOD  MODULE(QTEMP/EXSTRICT_T) SRCFILE(&LIB/QRPGLESRC)
+             CRTPGM     PGM(QTEMP/EXSTRICT_T) MODULE(QTEMP/EXSTRICT_T) +
+                          BNDSRVPGM((*LIBL/IMOQENG)) +
+                          ACTGRP(*NEW)
+
+/* 3. Run it. A failed expect() arrives as escape message CPF9898.  */
+             CALL       PGM(QTEMP/EXSTRICT_T)
+             MONMSG     MSGID(CPF9898) EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP) MSG(&MSG)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXSTRICT +
+                          failed:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             ENDDO
+
+/* 4. Remove the mock                                               */
+             IMOQRMV
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('EXSTRICT +
+                          passed') MSGTYPE(*COMP)
+             ENDPGM

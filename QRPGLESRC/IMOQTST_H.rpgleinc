@@ -1,0 +1,116 @@
+**free
+// ------------------------------------------------------------------
+// IMOQTST_H - minimal test harness for the iMoq demo and unit
+// tests (used where RPGUnit is not installed). Include after the
+// test module's own global declarations.
+// ------------------------------------------------------------------
+dcl-ds tst_psds psds;
+  tst_excId char(7) pos(40);
+end-ds;
+dcl-s tst_rptPtr pointer;
+dcl-s tst_rpt char(8000) based(tst_rptPtr);
+dcl-s tst_lines int(10);
+dcl-s tst_passed int(10);
+dcl-s tst_failed int(10);
+dcl-s tst_name varchar(80);
+dcl-s tst_bad ind;
+
+dcl-proc tst_init;
+  dcl-pi *n;
+    report char(8000);
+  end-pi;
+  tst_rptPtr = %addr(report);
+  report = *blanks;
+  tst_lines = 0;
+  tst_passed = 0;
+  tst_failed = 0;
+end-proc;
+
+dcl-proc tst_log;
+  dcl-pi *n;
+    text varchar(2000) const;
+  end-pi;
+  dcl-s t varchar(2000);
+  dcl-s n int(10);
+  t = text;
+  dow %len(t) > 0 and tst_lines < 40;
+    n = %len(t);
+    if n > 200;
+      n = 200;
+    endif;
+    %subst(tst_rpt : tst_lines * 200 + 1 : 200) = %subst(t : 1 : n);
+    tst_lines += 1;
+    if %len(t) > n;
+      t = '      ' + %subst(t : n + 1);
+    else;
+      t = '';
+    endif;
+  enddo;
+end-proc;
+
+dcl-proc tst_begin;
+  dcl-pi *n;
+    name varchar(80) const;
+  end-pi;
+  tst_name = name;
+  tst_bad = *off;
+end-proc;
+
+dcl-proc tst_end;
+  if tst_bad;
+    tst_failed += 1;
+    tst_log('FAIL ' + tst_name);
+  else;
+    tst_passed += 1;
+    tst_log('ok   ' + tst_name);
+  endif;
+end-proc;
+
+dcl-proc tst_check;
+  dcl-pi *n;
+    cond ind const;
+    what varchar(1000) const;
+  end-pi;
+  if not cond;
+    tst_bad = *on;
+    tst_log('  in "' + tst_name + '": ' + what);
+  endif;
+end-proc;
+
+dcl-proc tst_eqChar;
+  dcl-pi *n;
+    expected varchar(1024) const;
+    actual varchar(1024) const;
+    what varchar(100) const;
+  end-pi;
+  tst_check(%trimr(expected) = %trimr(actual) : what + ' expected '''
+          + %trimr(expected) + ''' but was ''' + %trimr(actual) + '''');
+end-proc;
+
+dcl-proc tst_eqNum;
+  dcl-pi *n;
+    expected packed(31:9) const;
+    actual packed(31:9) const;
+    what varchar(100) const;
+  end-pi;
+  tst_check(expected = actual : what + ' expected ' + %char(expected)
+          + ' but was ' + %char(actual));
+end-proc;
+
+dcl-proc tst_error;
+  dcl-pi *n;
+    detail varchar(512) const;
+  end-pi;
+  tst_bad = *on;
+  tst_log('  in "' + tst_name + '": unexpected error ' + tst_excId
+        + ' ' + detail);
+end-proc;
+
+dcl-proc tst_summary;
+  dcl-pi *n;
+    failures int(10);
+  end-pi;
+  failures = tst_failed;
+  tst_log(%char(tst_passed) + ' passed, ' + %char(tst_failed)
+        + ' failed');
+end-proc;

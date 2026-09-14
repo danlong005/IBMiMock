@@ -1,0 +1,36 @@
+/* ---------------------------------------------------------------- */
+/* EXTHROW - Make a dependency fail with an escape message          */
+/*                                                                  */
+/* Driver for test program EXTHROW_T.                               */
+/*   CRTBNDCL PGM(IMOQ/EXTHROW) SRCFILE(IMOQ/QCLLESRC)              */
+/*   CALL IMOQ/EXTHROW PARM('IMOQ')                                 */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+
+/* iMoq and the example source are in &LIB                          */
+             CHGCURLIB  CURLIB(&LIB)
+
+/* 1. Create the mock                                               */
+             IMOQPGM    OBJ(EXCUST) PARMS((*CHAR 5) (*CHAR 30) (*IND))
+
+/* 2. Compile the test program                                      */
+             CRTRPGMOD  MODULE(QTEMP/EXTHROW_T) SRCFILE(&LIB/QRPGLESRC)
+             CRTPGM     PGM(QTEMP/EXTHROW_T) MODULE(QTEMP/EXTHROW_T) +
+                          BNDSRVPGM((*LIBL/IMOQENG)) +
+                          ACTGRP(*NEW)
+
+/* 3. Run it. A failed expect() arrives as escape message CPF9898.  */
+             CALL       PGM(QTEMP/EXTHROW_T)
+             MONMSG     MSGID(CPF9898) EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP) MSG(&MSG)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXTHROW +
+                          failed:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             ENDDO
+
+/* 4. Remove the mock                                               */
+             IMOQRMV
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('EXTHROW +
+                          passed') MSGTYPE(*COMP)
+             ENDPGM

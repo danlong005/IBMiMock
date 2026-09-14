@@ -1,6 +1,10 @@
-# IBMiMock
+<p align="center">
+  <img src="docs/images/imoq-logo.svg" alt="iMoq" width="480">
+</p>
 
-**IBMIMOCK** is a mocking framework for RPG unit tests on IBM i, in the spirit of
+# iMoq
+
+**iMoq** is a mocking framework for RPG unit tests on IBM i, in the spirit of
 Mockito and Moq.
 
 Your CL test driver runs a few commands. They replace the programs and service
@@ -9,31 +13,32 @@ mocks return, check how they were called, and remove them when done. It needs
 no changes to the code under test, and no real customers, tax tables or files.
 
 ```
-MOCKPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
-MOCKWHEN   OBJ(CUSTLKUP) ARGS((1 *EQ C001)) SETPARM((2 'ACME') (3 '1'))
+IMOQPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
+IMOQWHEN   OBJ(CUSTLKUP) ARGS((1 *EQ C001)) SETPARM((2 'ACME') (3 '1'))
    ... run the code under test ...
-MOCKVERIFY OBJ(CUSTLKUP) ARGS((1 *EQ C001)) TIMES(*ONCE)
-MOCKRMV
+IMOQVERIFY OBJ(CUSTLKUP) ARGS((1 *EQ C001)) TIMES(*ONCE)
+IMOQRMV
 ```
 
 ## Features
 
-- **Mocks for `*PGM` and `*SRVPGM` dependencies.** A service program mock copies
-  the real exports and signatures, so callers bound with `*LIBL` activate it
-  without errors.
+- **Mocks for `*PGM` and `*SRVPGM` dependencies.** A service program mock
+  either copies the real object's exports and signatures, or is defined entirely
+  by commands. Either way you don't write any stub source: no binder source and
+  no dummy programs.
 - **Stubbing:**
   - return values, output parameters and escape messages
   - argument matchers (`*EQ`, `*GT`, `*LIKE`, `*OMIT`, …)
   - consecutive answers and `TIMES(n)` limits
   - loose or strict mocks
 - **Verification:** exact, at-least, at-most and never counts,
-  `MOCKNOMORE`, and argument capture. Failure messages list the calls that
+  `IMOQNOMORE`, and argument capture. Failure messages list the calls that
   actually happened.
 - **No recompiles between tests.** Stubs are stored as data, so you create
   mocks once per driver and restub them in every test.
-- **Works from CL and RPG.** The commands run in CL drivers, and the `MOCK_H`
+- **Works from CL and RPG.** The commands run in CL drivers, and the `IMOQ_H`
   copybook wraps them for RPGUnit (or any RPG) tests.
-- **Built-in safety checks.** IBMIMOCK tells you when a mock would be ignored
+- **Built-in safety checks.** iMoq tells you when a mock would be ignored
   because the library list or a hard-coded binding bypasses QTEMP.
 
 ## Quick start
@@ -44,24 +49,24 @@ On the IBM i (IBM i 7.4 or later):
 git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
 
 CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
-CALL     QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock' '*YES')
+CALL     QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
 ```
 
 `BUILD` creates the library and its source files, copies the repository into
 source members, compiles everything, and (with `'*YES'`) runs the self-tests.
-Then add `IBMIMOCK` to your test driver's library list, and bind your test
-programs to service program `IBMIMOCK/MOCKENG`.
+Then add library `IMOQ` to your test driver's library list, and bind your test
+programs to service program `IMOQ/IMOQENG`.
 
 A test in RPG looks like this:
 
 ```rpgle
 dcl-proc test_total_adds_tax export;
   dcl-s name char(50);
-  mock('MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
+  imoq('IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
 
   aEqual('106.00' : %char(order_total('C001' : 100 : 'PA' : name)));
-  assert(mock_ok('MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*ONCE)')
-         : mock_lastError());
+  assert(imoq_ok('IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*ONCE)')
+         : imoq_lastError());
 end-proc;
 ```
 
@@ -87,18 +92,20 @@ physical file.
 
 | Folder | Contents |
 |---|---|
-| `QRPGLESRC` | Engine (`MOCKENG`, `MOCKGEN`, `MOCKCDC`), copybooks `MOCK_H` and `MOCKENG_H` |
-| `QCLLESRC` | `BUILD`, the `MOCKINST` installer, command processing programs `MCK*C` |
-| `QCMDSRC` | Command definitions `MOCKPGM` … `MOCKCHK` |
-| `QSRVSRC` | Binder source for `MOCKENG` |
+| `QRPGLESRC` | Engine (`IMOQENG`, `IMOQGEN`, `IMOQCDC`), copybooks `IMOQ_H` and `IMOQENG_H` |
+| `QCLLESRC` | `BUILD`, the `IMOQINST` installer, command processing programs `IMQ*C` |
+| `QCMDSRC` | Command definitions `IMOQPGM` … `IMOQCHK` |
+| `QSRVSRC` | Binder source for `IMOQENG` |
 | `examples` | Example code ([documented here](docs/EXAMPLES.md)), in the same source-file folders (`QRPGLESRC`, `QCLLESRC`, `QSRVSRC`) |
 | `docs` | Programmer's Guide and Examples |
 
-The engine's unit tests, `MOCKTEST` and `MOCKENG_T` (with the `MOCKTST_H`
+The engine's unit tests, `IMOQTEST` and `IMOQENG_T` (with the `IMOQTST_H`
 harness), stay with the library code. The `examples` folder holds two kinds of
 example:
-- **Feature examples:** `EX*` members, run by `EXAMPLES`, one feature each.
+- **Feature examples:** one feature each, as a test program `EX…_T` (RPG)
+  plus a small CL driver `EX…` that creates the mocks and runs it. `EXAMPLES`
+  runs them all.
 - **End-to-end demo:** code under test `DEMOCUT`, its dependencies `DEMODEP`
-  and `DEMOSRV`, tests `DEMOCUT_T`, and driver `MOCKDEMO`.
+  and `DEMOSRV`, tests `DEMOCUT_T`, and driver `IMOQDEMO`.
 
 `BUILD` copies and runs the examples only when you pass `'*YES'`.

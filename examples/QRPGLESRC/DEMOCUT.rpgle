@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// DEMOCUT - IBMIMOCK demo code under test (*SRVPGM).
+// DEMOCUT - iMoq demo code under test (*SRVPGM).
 // Uses program DEMODEP (dynamic call) and service program DEMOSRV
 // (bound call). Bind with BNDSRVPGM((*LIBL/DEMOSRV)).
 // ------------------------------------------------------------------

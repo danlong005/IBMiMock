@@ -1,0 +1,202 @@
+/* ---------------------------------------------------------------- */
+/* IMOQINST - build iMoq into a library                             */
+/*                                                                  */
+/*   CALL IMOQINST PARM('IMOQ' 'SRCLIB')                            */
+/*   1: library to build into (default: current library)            */
+/*   2: library holding QRPGLESRC, QCLLESRC, QCMDSRC and QSRVSRC    */
+/*      (default: the build library)                                */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&PLIB &PSRCLIB)
+             DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&PSRCLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CPP) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&CMD) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSGF) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+             DCL        VAR(&STEP) TYPE(*CHAR) LEN(40)
+             DCL        VAR(&INLIBL) TYPE(*LGL) VALUE('0')
+
+             MONMSG     MSGID(CPF0000 MCH0000 RNS0000 SQL0000) +
+                          EXEC(GOTO CMDLBL(FAIL))
+
+             CHGJOB     INQMSGRPY(*DFT)
+             RTVJOBA    CURLIB(&LIB)
+             CHGVAR     VAR(&LIB) VALUE(&PLIB)
+             MONMSG     MSGID(MCH3601)
+             CHGVAR     VAR(&SRCLIB) VALUE(&LIB)
+             CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
+             MONMSG     MSGID(MCH3601)
+
+/* Make the library available without moving it ahead of QTEMP;     */
+/* take it off the list again at the end if it was added here.      */
+             ADDLIBLE   LIB(&LIB) POSITION(*LAST)
+             MONMSG     MSGID(CPF2103) EXEC(CHGVAR VAR(&INLIBL) +
+                          VALUE('1'))
+
+/* Engine copybook is included from QTEMP so any source file works */
+             CHGVAR     VAR(&STEP) VALUE('copybook')
+             DLTF       FILE(QTEMP/IMOQINC)
+             MONMSG     MSGID(CPF2105)
+             CRTSRCPF   FILE(QTEMP/IMOQINC) RCDLEN(240)
+             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/IMOQINC) +
+                          FROMMBR(IMOQENG_H)
+
+             CHGVAR     VAR(&STEP) VALUE('message file')
+             CALLSUBR   SUBR(MSGFILE)
+
+             CHGVAR     VAR(&STEP) VALUE('IMOQCDC module')
+             CRTRPGMOD  MODULE(QTEMP/IMOQCDC) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IMOQCDC) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('IMOQENG module')
+             CRTSQLRPGI OBJ(QTEMP/IMOQENG) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IMOQENG) COMMIT(*NONE) +
+                          OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('IMOQGEN module')
+             CRTSQLRPGI OBJ(QTEMP/IMOQGEN) SRCFILE(&SRCLIB/QRPGLESRC) +
+                          SRCMBR(IMOQGEN) COMMIT(*NONE) +
+                          OBJTYPE(*MODULE) GENLVL(11) DBGVIEW(*SOURCE)
+             CHGVAR     VAR(&STEP) VALUE('IMOQENG service program')
+             DLTSRVPGM  SRVPGM(&LIB/IMOQENG)
+             MONMSG     MSGID(CPF2105)
+             CRTSRVPGM  SRVPGM(&LIB/IMOQENG) MODULE(QTEMP/IMOQCDC +
+                          QTEMP/IMOQENG QTEMP/IMOQGEN) +
+                          EXPORT(*SRCFILE) SRCFILE(&SRCLIB/QSRVSRC) +
+                          SRCMBR(IMOQENG) ACTGRP(IMOQ) +
+                          TEXT('iMoq engine')
+
+             CHGVAR     VAR(&CPP) VALUE('IMQPGMC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQPGM')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQSRVC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQSRVPGM')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQPRCC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQPROC')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQBLDC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQBUILD')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQWHNC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQWHEN')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQVFYC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQVERIFY')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQNMRC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQNOMORE')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQARGC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQGETARG')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQCNTC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQCOUNT')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQRSTC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQRESET')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQRMVC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQRMV')
+             CALLSUBR   SUBR(BUILD)
+             CHGVAR     VAR(&CPP) VALUE('IMQCHKC')
+             CHGVAR     VAR(&CMD) VALUE('IMOQCHK')
+             CALLSUBR   SUBR(BUILD)
+
+             CHGVAR     VAR(&MSG) VALUE('iMoq installed in' *BCAT +
+                          &LIB)
+             IF         COND(*NOT &INLIBL) THEN(DO)
+             RMVLIBLE   LIB(&LIB)
+             MONMSG     MSGID(CPF0000)
+             ENDDO
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&MSG) +
+                          MSGTYPE(*COMP)
+             RETURN
+
+ FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSG(&MSG)
+             MONMSG     MSGID(CPF0000)
+             CHGVAR     VAR(&MSG) VALUE('IMOQINST failed at' *BCAT +
+                          &STEP *TCAT ':' *BCAT &MSG)
+             MONMSG     MSGID(CPF0000)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA(&MSG) +
+                          MSGTYPE(*ESCAPE)
+             MONMSG     MSGID(CPF0000)
+             RETURN
+
+/* ---- compile one command processing program and its command ---- */
+             SUBR       SUBR(BUILD)
+             CHGVAR     VAR(&STEP) VALUE(&CPP)
+             CRTCLMOD   MODULE(QTEMP/&CPP) SRCFILE(&SRCLIB/QCLLESRC) +
+                          SRCMBR(&CPP)
+             DLTPGM     PGM(&LIB/&CPP)
+             MONMSG     MSGID(CPF2105)
+             CRTPGM     PGM(&LIB/&CPP) MODULE(QTEMP/&CPP) +
+                          BNDSRVPGM((&LIB/IMOQENG)) ACTGRP(*CALLER)
+             DLTMOD     MODULE(QTEMP/&CPP)
+             CHGVAR     VAR(&STEP) VALUE(&CMD)
+             DLTCMD     CMD(&LIB/&CMD)
+             MONMSG     MSGID(CPF2105)
+             IF         COND(&CMD *EQ 'IMOQGETARG' *OR &CMD *EQ +
+                          'IMOQCOUNT') THEN(DO)
+             CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
+                          SRCFILE(&SRCLIB/QCMDSRC) SRCMBR(&CMD) +
+                          ALLOW(*IPGM *BPGM *IMOD *BMOD)
+             ENDDO
+             ELSE       CMD(DO)
+             CRTCMD     CMD(&LIB/&CMD) PGM(&LIB/&CPP) +
+                          SRCFILE(&SRCLIB/QCMDSRC) SRCMBR(&CMD)
+             ENDDO
+             ENDSUBR
+
+/* ---- message file ------------------------------------------------ */
+             SUBR       SUBR(MSGFILE)
+             CHGVAR     VAR(&MSGF) VALUE('IMOQMSGF  ' *CAT &LIB)
+             DLTMSGF    MSGF(&LIB/IMOQMSGF)
+             MONMSG     MSGID(CPF2105)
+             CRTMSGF    MSGF(&LIB/IMOQMSGF) TEXT('iMoq messages')
+             ADDMSGD    MSGID(IMQ0001) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(0) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0010) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('The object found first in the +
+                          library list is not the mock in QTEMP, so +
+                          the code under test would call the real +
+                          object. The current library and product +
+                          libraries are searched before QTEMP.') +
+                          SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0011) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0012) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0013) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0014) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0015) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0016) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('iMoq only replaces or deletes +
+                          objects whose text is iMoq mock.') +
+                          SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0020) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(20) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0021) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0100) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('A strict mock received a call that +
+                          no IMOQWHEN matched.') SEV(40) +
+                          FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0101) MSGF(&LIB/IMOQMSGF) +
+                          MSG('Mock threw: &1') SECLVL('Escape message +
+                          sent by IMOQWHEN THROW(*MOCK).') SEV(40) +
+                          FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0200) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0201) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0202) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('&1') SEV(40) FMT((*CHAR 512))
+             ADDMSGD    MSGID(IMQ0300) MSGF(&LIB/IMOQMSGF) MSG('&1') +
+                          SECLVL('A command run with imoq() failed.') +
+                          SEV(40) FMT((*CHAR 512))
+             ENDSUBR
+             ENDPGM

@@ -1,0 +1,43 @@
+/* ---------------------------------------------------------------- */
+/* IMOQENG - binder source for service program IMOQENG (iMoq)       */
+/* Append new exports at the end; never reorder or remove.          */
+/* ---------------------------------------------------------------- */
+STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('IMOQ V1')
+  /* stub runtime */
+  EXPORT     SYMBOL(IMOQ_INVOKE)
+  /* public API for test programs (IMOQ_H) */
+  EXPORT     SYMBOL(IMOQ_RUN)
+  EXPORT     SYMBOL(IMOQ_OK)
+  EXPORT     SYMBOL(IMOQ_LASTERROR)
+  EXPORT     SYMBOL(IMOQ_ARG)
+  EXPORT     SYMBOL(IMOQ_COUNT)
+  /* command processing program entries */
+  EXPORT     SYMBOL(IMOQ_CL_DEFPGM)
+  EXPORT     SYMBOL(IMOQ_CL_DEFSRV)
+  EXPORT     SYMBOL(IMOQ_CL_DEFPROC)
+  EXPORT     SYMBOL(IMOQ_CL_GENSRV)
+  EXPORT     SYMBOL(IMOQ_CL_SETBUILT)
+  EXPORT     SYMBOL(IMOQ_CL_FAIL)
+  EXPORT     SYMBOL(IMOQ_CL_WHEN)
+  EXPORT     SYMBOL(IMOQ_CL_VERIFY)
+  EXPORT     SYMBOL(IMOQ_CL_NOMORE)
+  EXPORT     SYMBOL(IMOQ_CL_GETARG)
+  EXPORT     SYMBOL(IMOQ_CL_COUNT)
+  EXPORT     SYMBOL(IMOQ_CL_RESET)
+  EXPORT     SYMBOL(IMOQ_CL_LIST)
+  EXPORT     SYMBOL(IMOQ_CL_FORGET)
+  EXPORT     SYMBOL(IMOQ_CL_CHECK)
+  /* internals exported for the IMOQENG_T unit tests */
+  EXPORT     SYMBOL(IMOQ_NORMDEF)
+  EXPORT     SYMBOL(IMOQ_DECODE)
+  EXPORT     SYMBOL(IMOQ_ENCODE)
+  EXPORT     SYMBOL(IMOQ_MATCH)
+  EXPORT     SYMBOL(IMOQ_ISNUMERIC)
+  EXPORT     SYMBOL(IMOQ_RPGTYPE)
+  EXPORT     SYMBOL(IMOQ_VALIDMATCHER)
+  EXPORT     SYMBOL(IMOQ_GENPGM)
+  EXPORT     SYMBOL(IMOQ_GENSRV)
+  EXPORT     SYMBOL(IMOQ_READEXPORTS)
+  /* added later */
+  EXPORT     SYMBOL(IMOQ_CL_MOCKLIB)
+ENDPGMEXP

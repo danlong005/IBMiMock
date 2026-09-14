@@ -1,11 +1,15 @@
-# IBMIMOCK Programmer's Guide
+<p align="center">
+  <img src="images/imoq-logo.svg" alt="iMoq" width="360">
+</p>
 
-IBMIMOCK gives your CL test driver commands that put stand-in objects in QTEMP. The code under test calls those stand-ins instead of the real programs. Your tests then decide what they answer and check how they were called.
+# iMoq Programmer's Guide
+
+iMoq gives your CL test driver commands that put stand-in objects in QTEMP. The code under test calls those stand-ins instead of the real programs. Your tests then decide what they answer and check how they were called.
 
 | | |
 |---|---|
-| Commands and engine | `MOCK*` commands, service program `MOCKENG` |
-| Copybook for RPG tests | `MOCK_H` |
+| Commands and engine | `IMOQ*` commands, service program `IMOQENG` |
+| Copybook for RPG tests | `IMOQ_H` |
 | Requires | IBM i 7.4 or later |
 | Examples | [One short example per feature](EXAMPLES.md) |
 | Project | [IBMiMock on GitHub](../README.md) |
@@ -13,7 +17,7 @@ IBMIMOCK gives your CL test driver commands that put stand-in objects in QTEMP. 
 ## Contents
 
 1. [The big picture](#1-the-big-picture)
-2. [Installing IBMIMOCK](#2-installing-ibmimock)
+2. [Installing iMoq](#2-installing-imoq)
 3. [Four rules](#3-four-rules)
 4. [Your first mocked test](#4-your-first-mocked-test)
 5. [Describing parameters](#5-describing-parameters)
@@ -39,10 +43,10 @@ Everything happens in **one job**, driven by a CL program:
 | Step | What | Commands |
 |---|---|---|
 | 1 | Set the library list | `CHGCURLIB *CRTDFT`, `ADDLIBLE MYLIB *LAST` |
-| 2 | Create mocks | `MOCKPGM`; `MOCKSRVPGM` + `MOCKPROC` + `MOCKBUILD` |
+| 2 | Create mocks | `IMOQPGM`; `IMOQSRVPGM` + `IMOQPROC` + `IMOQBUILD` |
 | 3 | Compile code and tests | `CRTSRVPGM … BNDSRVPGM((*LIBL/TAXSRV))`, `RUCRTRPG` |
-| 4 | Run tests | `RUCALLTST` (tests use `MOCKWHEN` / `MOCKVERIFY`) |
-| 5 | Clean up | `MOCKRMV` |
+| 4 | Run tests | `RUCALLTST` (tests use `IMOQWHEN` / `IMOQVERIFY`) |
+| 5 | Clean up | `IMOQRMV` |
 
 The order matters: mocks must exist before anything that uses them is activated.
 
@@ -51,23 +55,23 @@ The order matters: mocks must exist before anything that uses them is activated.
 | Dependency | When IBM i finds it | What the mock needs |
 |---|---|---|
 | `*PGM`, called with `CALLP` + `EXTPGM` or CL `CALL` | At the first call, by searching the library list | QTEMP searched before the library that holds the real program |
-| `*SRVPGM` procedure | When the calling program is activated, from the library saved at bind time | The caller bound through `*LIBL`. IBMIMOCK copies the real signatures, so activation accepts the mock. |
+| `*SRVPGM` procedure | When the calling program is activated, from the library saved at bind time | The caller bound through `*LIBL`, and a matching signature: bind the caller after `IMOQBUILD`, or use `SRCFILE(*RTV)` to copy the real object's signatures. |
 
 Stubs are stored as rows in QTEMP tables, not compiled into the mock. You create a mock *once* per driver, and each test can change what it answers without recompiling.
 
 ### What happens on each call
 
-Every stub hands the call to `MOCK_INVOKE` in service program `MOCKENG`:
+Every stub hands the call to `IMOQ_INVOKE` in service program `IMOQENG`:
 
-1. The arguments are recorded in `QTEMP/MOCK_CALL` and `QTEMP/MOCK_CARG`, as they arrived.
-2. The newest `MOCKWHEN` whose argument matchers accept the call, and that still has uses left, is chosen.
+1. The arguments are recorded in `QTEMP/IMOQ_CALL` and `QTEMP/IMOQ_CARG`, as they arrived.
+2. The newest `IMOQWHEN` whose argument matchers accept the call, and that still has uses left, is chosen.
 3. Its answer is applied: `SETPARM` writes output parameters, `RETURN` sets the return value, and `THROW` sends an escape message to the caller. With no matching stub, a loose mock does nothing and a strict mock throws.
 
 ---
 
-## 2. Installing IBMIMOCK
+## 2. Installing iMoq
 
-IBMIMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need RPGUnit, but works well with it.
+iMoq needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't need RPGUnit, but works well with it.
 
 ### Build from the repository
 
@@ -82,15 +86,15 @@ IBMIMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't ne
    ```
 3. Run it, naming the library to build into and the repository directory:
    ```
-   CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock')
-   CALL QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock' '*YES')
+   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock')
+   CALL QTEMP/BUILD PARM('IMOQ' '/home/ME/IBMiMock' '*YES')
    ```
 
 `BUILD` does the following:
 
 1. Creates the library if it doesn't exist, plus the source files `QRPGLESRC`, `QCLLESRC`, `QCMDSRC` and `QSRVSRC`.
-2. Copies every file into a member of the same name, using the extension as the source type (`MOCKENG.sqlrpgle` becomes member `MOCKENG`, type `SQLRPGLE`). The copy is logged to `build.log` in the repository directory.
-3. Compiles and runs `MOCKINST`, which builds everything.
+2. Copies every file into a member of the same name, using the extension as the source type (`IMOQENG.sqlrpgle` becomes member `IMOQENG`, type `SQLRPGLE`). The copy is logged to `build.log` in the repository directory.
+3. Compiles and runs `IMOQINST`, which builds everything.
 4. With `'*YES'` as the third parameter, also runs the self-tests.
 
 - **Long paths:** a quoted `CALL` parameter is only reliable up to 32 characters. For a longer path, run `CHGCURDIR DIR('/the/long/path/IBMiMock')` and pass `'*CURDIR'`, which is also the default.
@@ -100,19 +104,19 @@ IBMIMOCK needs IBM i 7.4 or later; it was built and tested on 7.5. It doesn't ne
 
 | Object | Purpose |
 |---|---|
-| `MOCKPGM` … `MOCKCHK` `*CMD` | The commands |
-| `MCK*C` `*PGM` | Their CL command processing programs |
-| `MOCKENG` `*SRVPGM` (activation group `IBMIMOCK`) | Engine: stub runtime, matchers, verification, source generation |
-| `MOCKMSGF` `*MSGF` | `MCKnnnn` messages |
+| `IMOQPGM` … `IMOQCHK` `*CMD` | The commands |
+| `IMQ*C` `*PGM` | Their CL command processing programs |
+| `IMOQENG` `*SRVPGM` (activation group `IMOQ`) | Engine: stub runtime, matchers, verification, source generation |
+| `IMOQMSGF` `*MSGF` | `IMQnnnn` messages |
 
-To use IBMIMOCK, a test driver needs the library in its library list (anywhere; it holds nothing that gets mocked), and test programs bind service program `MOCKENG`. Copy `MOCK_H` from its `QRPGLESRC` into your tests.
+To use iMoq, a test driver needs the library in its library list (anywhere; it holds nothing that gets mocked), and test programs bind service program `IMOQENG`. Copy `IMOQ_H` from its `QRPGLESRC` into your tests.
 
 ### Rebuild after changing the source
 
 If you edit members in the library (with RDi or SEU, for example), rebuild with:
 
 ```
-CALL IBMIMOCK/MOCKINST PARM('IBMIMOCK')
+CALL IMOQ/IMOQINST PARM('IMOQ')
 ```
 
 An optional second parameter names a different library holding the four source files.
@@ -121,21 +125,21 @@ An optional second parameter names a different library holding the four source f
 
 | Driver | Tests | What it covers |
 |---|---|---|
-| `MOCKTEST` | `MOCKENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
-| `EXAMPLES` (from `examples/`) | `EXPGM` … `EXFAILMSG`, `EXCL` | One small example per feature; see [Examples](EXAMPLES.md) |
-| `MOCKDEMO` (from `examples/`) | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
+| `IMOQTEST` | `IMOQENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
+| `EXAMPLES` (from `examples/`) | Drivers `EXPGM` … `EXERRMSG` (test programs `EX…_T`), `EXCL` | One small example per feature; see [Examples](EXAMPLES.md) |
+| `IMOQDEMO` (from `examples/`) | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
 
-Run them with `BUILD` and `'*YES'`, which also copies the example source from the repository's `examples` folder into the library. After a build, you can also run them with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')`, `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')` and `CALL IBMIMOCK/EXAMPLES PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` and `EXAMPLES` change the current library and library list of the job that runs them.
+Run them with `BUILD` and `'*YES'`, which also copies the example source from the repository's `examples` folder into the library. After a build, you can also run them with `CALL IMOQ/IMOQTEST PARM('IMOQ')`, `CALL IMOQ/IMOQDEMO PARM('IMOQ')` and `CALL IMOQ/EXAMPLES PARM('IMOQ')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `IMOQDEMO` and `EXAMPLES` change the current library and library list of the job that runs them.
 
 ---
 
 ## 3. Four rules
 
-Almost every "the real program ran anyway" problem breaks one of these rules. IBMIMOCK checks the first two for you.
+Almost every "the real program ran anyway" problem breaks one of these rules. iMoq checks the first two for you.
 
 ### Rule 1: QTEMP must come first
 
-The system portion, product libraries and **the current library** are searched *before* QTEMP. Build scripts and job descriptions often make the development library `*CURLIB`. In a test driver, move it below QTEMP first. Otherwise `MOCKPGM` and `MOCKBUILD` stop with **MCK0010**.
+The system portion, product libraries and **the current library** are searched *before* QTEMP. Build scripts and job descriptions often make the development library `*CURLIB`. In a test driver, move it below QTEMP first. Otherwise `IMOQPGM` and `IMOQBUILD` stop with **IMQ0010**.
 
 ```
 CHGCURLIB  CURLIB(*CRTDFT)
@@ -144,7 +148,7 @@ ADDLIBLE   LIB(MYLIB) POSITION(*LAST)
 
 ### Rule 2: Bind service programs through `*LIBL`
 
-Code under test bound with `BNDSRVPGM((MYLIB/TAXSRV))` always activates `MYLIB/TAXSRV`. Use `BNDSRVPGM((*LIBL/TAXSRV))`, or a binding directory entry whose library is `*LIBL`. `MOCKCHK PGM(MYLIB/ORDERSRV)` reports bad bindings as **MCK0021**.
+Code under test bound with `BNDSRVPGM((MYLIB/TAXSRV))` always activates `MYLIB/TAXSRV`. Use `BNDSRVPGM((*LIBL/TAXSRV))`, or a binding directory entry whose library is `*LIBL`. `IMOQCHK PGM(MYLIB/ORDERSRV)` reports bad bindings as **IMQ0021**.
 
 ### Rule 3: Create mocks before activation
 
@@ -158,7 +162,7 @@ QTEMP belongs to a job. Creating mocks in one SSH session and running tests in a
 
 ## 4. Your first mocked test
 
-The walkthrough uses a small order-pricing service. The same scenario ships as a runnable example in the repository's `examples` folder: `DEMOCUT`, `DEMODEP`, `DEMOSRV` and `DEMOCUT_T` in `examples/QRPGLESRC`, driver `MOCKDEMO` in `examples/QCLLESRC`. `BUILD` with `'*YES'` copies it into the library, and then `CALL IBMIMOCK/MOCKDEMO` shows it passing.
+The walkthrough uses a small order-pricing service. The same scenario ships as a runnable example in the repository's `examples` folder: `DEMOCUT`, `DEMODEP`, `DEMOSRV` and `DEMOCUT_T` in `examples/QRPGLESRC`, driver `IMOQDEMO` in `examples/QCLLESRC`. `BUILD` with `'*YES'` copies it into the library, and then `CALL IMOQ/IMOQDEMO` shows it passing.
 
 ### Step 1: Read the code under test
 
@@ -197,7 +201,7 @@ end-proc;
 
 ### Step 2: Write the driver and create the mocks
 
-`MOCKPGM` needs the program's parameter layout. `MOCKSRVPGM` reads the real service program's exports and signatures. `MOCKPROC` describes each procedure whose arguments or return value you care about, and `MOCKBUILD` creates the object.
+`IMOQPGM` needs the program's parameter layout. `IMOQSRVPGM` starts a service program mock; by default it needs no real object or binder source. `IMOQPROC` declares each procedure the code under test calls, and `IMOQBUILD` creates the object. The code under test is compiled in the next step, after `IMOQBUILD`, so it binds to the mock.
 
 ```
              PGM
@@ -207,30 +211,30 @@ end-proc;
              ADDLIBLE   LIB(RPGUNIT) POSITION(*LAST)
 
 /* Mocks: before anything is compiled against or activated */
-             MOCKPGM    OBJ(CUSTLKUP) +
+             IMOQPGM    OBJ(CUSTLKUP) +
                           PARMS((*CHAR 10) (*CHAR 50) (*IND))
-             MOCKSRVPGM OBJ(TAXSRV) BEHAVIOR(*STRICT)
-             MOCKPROC   OBJ(TAXSRV) PROC(CALCTAX) +
+             IMOQSRVPGM OBJ(TAXSRV) BEHAVIOR(*STRICT)
+             IMOQPROC   OBJ(TAXSRV) PROC(CALCTAX) +
                           RTNTYPE(*PACKED 11 2) +
                           PARMS((*PACKED 11 2 *CONST) (*CHAR 2 *CONST))
-             MOCKBUILD  OBJ(TAXSRV)
+             IMOQBUILD  OBJ(TAXSRV)
 ```
 
 ### Step 3: Compile the code under test and the tests
 
-Bind the service program through `*LIBL`, check with `MOCKCHK`, and bind the test program to `MOCKENG` so it can use `MOCK_H`.
+Bind the service program through `*LIBL`, check with `IMOQCHK`, and bind the test program to `IMOQENG` so it can use `IMOQ_H`.
 
 ```
              CRTRPGMOD  MODULE(QTEMP/ORDERSRV) SRCFILE(MYLIB/QRPGLESRC)
              CRTSRVPGM  SRVPGM(MYLIB/ORDERSRV) MODULE(QTEMP/ORDERSRV) +
                           EXPORT(*ALL) BNDSRVPGM((*LIBL/TAXSRV))
-             MOCKCHK    PGM(MYLIB/ORDERSRV)
+             IMOQCHK    PGM(MYLIB/ORDERSRV)
 
              RUCRTRPG   TSTPGM(MYLIB/ORDERSRV_T) SRCFILE(MYLIB/QRPGLESRC) +
-                          BNDSRVPGM(MYLIB/ORDERSRV MYLIB/MOCKENG)
+                          BNDSRVPGM(MYLIB/ORDERSRV MYLIB/IMOQENG)
              RUCALLTST  TSTPGM(MYLIB/ORDERSRV_T)
 
-             MOCKRMV
+             IMOQRMV
              ENDPGM
 ```
 
@@ -242,35 +246,35 @@ Each test resets the mocks, says what they should answer, calls the code, then c
 **free
 ctl-opt nomain;
 /include RPGUNIT/RPGUNIT1,TESTCASE
-/copy MYLIB/QRPGLESRC,MOCK_H
+/copy MYLIB/QRPGLESRC,IMOQ_H
 /copy MYLIB/QRPGLESRC,ORDERSRV_H
 
 dcl-proc SETUP export;
-  mock('MOCKRESET');                 // no stubs or calls left from earlier tests
+  imoq('IMOQRESET');                 // no stubs or calls left from earlier tests
 end-proc;
 
 dcl-proc test_total_adds_tax_for_known_customer export;
   dcl-s name char(50);
 
   // arrange
-  mock('MOCKWHEN OBJ(CUSTLKUP) ARGS((1 *EQ C001)) +
+  imoq('IMOQWHEN OBJ(CUSTLKUP) ARGS((1 *EQ C001)) +
         SETPARM((2 ''ACME CORP'') (3 ''1''))');
-  mock('MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
+  imoq('IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN(''6.00'')');
 
   // act + assert
   aEqual('106.00' : %char(order_total('C001' : 100 : 'PA' : name)));
   aEqual('ACME CORP' : name);
 
   // verify
-  assert(mock_ok('MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) +
+  assert(imoq_ok('IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) +
                   ARGS((1 *EQ 100) (2 *EQ PA)) TIMES(*ONCE)')
-         : mock_lastError());
+         : imoq_lastError());
 end-proc;
 ```
 
 ### Step 5: Run the driver and read the result
 
-Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or with `SBMJOB CMD(CALL MYLIB/ORDERDRV)`. When a verification fails, `assert` reports IBMIMOCK's explanation:
+Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or with `SBMJOB CMD(CALL MYLIB/ORDERDRV)`. When a verification fails, `assert` reports iMoq's explanation:
 
 ```
 Verification failed: expected TAXSRV.CALCTAX to be called exactly 1 time(s)
@@ -282,9 +286,9 @@ Recorded calls: #7('100.00', 'NJ')
 
 ## 5. Describing parameters
 
-IBMIMOCK doesn't read prototypes. You describe each parameter as `(type length decimals)`, plus a passing style for service program procedures. Copy the layout straight from the prototype:
+iMoq doesn't read prototypes. You describe each parameter as `(type length decimals)`, plus a passing style for service program procedures. Copy the layout straight from the prototype:
 
-| RPG declaration | `MOCKPGM PARMS` / `RTNTYPE` | `MOCKPROC PARMS` |
+| RPG declaration | `IMOQPGM PARMS` / `RTNTYPE` | `IMOQPROC PARMS` |
 |---|---|---|
 | `char(10)` | `(*CHAR 10)` | `(*CHAR 10)` |
 | `char(10) const` | `(*CHAR 10)` | `(*CHAR 10 *CONST)` |
@@ -302,26 +306,34 @@ IBMIMOCK doesn't read prototypes. You describe each parameter as `(type length d
 
 - **The passing style can go in the decimals slot.** `(*CHAR 2 *CONST)` and `(*PACKED 11 2 *CONST)` both work. The full form is `(*CHAR 2 0 *CONST)`.
 - **You only need to declare what you use.** A program mock records extra parameters as `*UNDECLARED`. You can still use `*ANY`, `*OMIT` and `*NOTPASSED` matchers on them, but not value matchers or `SETPARM`.
-- **Declare every export whose return value matters.** A service program export without `MOCKPROC` gets a stub with no parameters and no return value. It records calls and can throw, but a caller that reads its return value gets unpredictable data.
+- **Declare every export whose return value matters.** A service program export without `IMOQPROC` gets a stub with no parameters and no return value. It records calls and can throw, but a caller that reads its return value gets unpredictable data.
 - **Data structures:** describe a DS parameter as one `*CHAR` of its size. Matching and `SETPARM` then work on the whole record as text, which only makes sense when the subfields are character.
 - **Export names:** `PROC` is matched exactly first, then case-insensitively. RPG exports are uppercase unless the prototype uses `EXTPROC(*DCLCASE)` or a quoted name.
-- **Changed an interface?** Run `MOCKPROC` again, then `MOCKBUILD`. Stubs alone never need a rebuild.
-- **No real service program on the system?** By default `MOCKSRVPGM` reads exports and signatures from the real object (`SRCFILE(*RTV)`). Pass its binder source instead with `SRCFILE(lib/QSRVSRC) SRCMBR(name)`; every `*PRV` block is kept.
+- **Changed an interface?** Run `IMOQPROC` again, then `IMOQBUILD`. Stubs alone never need a rebuild.
+- **Where the exports come from.** `IMOQSRVPGM SRCFILE` chooses the source of the export list:
+
+  | `SRCFILE` | Exports | Signature | Needs |
+  |---|---|---|---|
+  | `*NONE` (default) | Exactly the procedures you declare with `IMOQPROC` | `SIGNATURE(*GEN)` (default) or `SIGNATURE('text')` | Nothing: no real object, no binder source |
+  | `*RTV` | Every export of the real service program, retrieved with `RTVBNDSRC` | The real object's signatures, so already-bound programs activate the mock | The real `*SRVPGM` in the library list |
+  | `lib/file` + `SRCMBR` | The `*CURRENT` block of that binder source; every `*PRV` block is kept | From the binder source | A binder source member |
+
+  With `*NONE`, programs that use the mock must be bound after `IMOQBUILD` (they bind to the mock itself), and the names you give `PROC` are the exact export symbols, which are usually uppercase. Use `*RTV` when the code under test is already compiled against the real service program and you don't want to rebind it.
 
 ---
 
 ## 6. Stubbing recipes
 
-Every recipe is a `MOCKWHEN` command. From RPG, wrap it in `mock('…')` and double the quotes. From CL, write it as shown.
+Every recipe is a `IMOQWHEN` command. From RPG, wrap it in `imoq('…')` and double the quotes. From CL, write it as shown.
 
-Values are checked against the declared layout when `MOCKWHEN` runs, so a mistake such as `RETURN('12345678901.99')` for `*PACKED 11 2` fails right away with **MCK0014** instead of at call time.
+Values are checked against the declared layout when `IMOQWHEN` runs, so a mistake such as `RETURN('12345678901.99')` for `*PACKED 11 2` fails right away with **IMQ0014** instead of at call time.
 
 ### Return a value
 
 Service program procedures with a declared `RTNTYPE`:
 
 ```
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('6.00')
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('6.00')
 ```
 
 ### Fill output parameters
@@ -329,7 +341,7 @@ MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('6.00')
 This is how program mocks "answer": they write into the caller's variables.
 
 ```
-MOCKWHEN OBJ(CUSTLKUP) SETPARM((2 'ACME CORP') (3 '1'))
+IMOQWHEN OBJ(CUSTLKUP) SETPARM((2 'ACME CORP') (3 '1'))
 ```
 
 Values are text, converted to the declared type: `'12.50'` for packed, `'1'`/`'0'` or `'*ON'`/`'*OFF'` for indicators, `'2026-09-13'` for dates. Parameters passed `*VALUE` or `*OMIT` can't be set.
@@ -337,9 +349,9 @@ Values are text, converted to the declared type: `'12.50'` for packed, `'1'`/`'0
 ### Answer only for certain arguments
 
 ```
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ NY)) RETURN('8.88')
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((1 *GT 1000)) RETURN('99.00')
-MOCKWHEN OBJ(CUSTLKUP) ARGS((1 *LIKE 'C_9%')) SETPARM((3 '1'))
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ NY)) RETURN('8.88')
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((1 *GT 1000)) RETURN('99.00')
+IMOQWHEN OBJ(CUSTLKUP) ARGS((1 *LIKE 'C_9%')) SETPARM((3 '1'))
 ```
 
 The matchers are `*EQ` (default), `*NE`, `*GT`, `*GE`, `*LT`, `*LE`, `*LIKE` (`%` any text, `_` one character), `*BLANK` (blanks, or zero for numbers), `*ANY`, `*OMIT` and `*NOTPASSED`. Numeric parameters compare as numbers, so `100` matches `100.00`. Character comparisons ignore trailing blanks. All matchers in one `ARGS` must match.
@@ -349,16 +361,16 @@ The matchers are `*EQ` (default), `*NE`, `*GT`, `*GE`, `*LT`, `*LE`, `*LIKE` (`%
 The newest matching stub wins.
 
 ```
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('5.00')                  /* default  */
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ NY)) RETURN('8.88') /* override */
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('5.00')                  /* default  */
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ NY)) RETURN('8.88') /* override */
 ```
 
-IBMIMOCK checks stubs from newest to oldest and uses the first one that matches and has uses left. Define broad stubs first (for example in `SETUP`) and narrow ones in the test.
+iMoq checks stubs from newest to oldest and uses the first one that matches and has uses left. Define broad stubs first (for example in `SETUP`) and narrow ones in the test.
 
 ### Different answers on successive calls
 
 ```
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('1.00' '2.00')
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) RETURN('1.00' '2.00')
 /* calls return 1.00, 2.00, 2.00, 2.00 ... */
 ```
 
@@ -367,7 +379,7 @@ The last value repeats. Use this for retry loops and paging. You can list up to 
 ### Answer only a limited number of times
 
 ```
-MOCKWHEN OBJ(CUSTLKUP) SETPARM((3 '1')) TIMES(1)
+IMOQWHEN OBJ(CUSTLKUP) SETPARM((3 '1')) TIMES(1)
 /* first call: found; later calls fall through to older stubs or the default behavior */
 ```
 
@@ -376,17 +388,17 @@ MOCKWHEN OBJ(CUSTLKUP) SETPARM((3 '1')) TIMES(1)
 `THROW` sends an escape message to the caller.
 
 ```
-MOCKWHEN OBJ(CUSTLKUP) THROW(CPF9898 QCPFMSG *LIBL 'Customer DB down')
-MOCKWHEN OBJ(TAXSRV) PROC(CALCTAX) THROW(*MOCK *MOCK *LIBL 'rate table locked')
+IMOQWHEN OBJ(CUSTLKUP) THROW(CPF9898 QCPFMSG *LIBL 'Customer DB down')
+IMOQWHEN OBJ(TAXSRV) PROC(CALCTAX) THROW(*MOCK *MOCK *LIBL 'rate table locked')
 ```
 
-The code under test sees an ordinary escape message, so `MONITOR` and `MONMSG` behave exactly as in production. `THROW` takes **one** set of parentheses. `*MOCK` sends **MCK0101**.
+The code under test sees an ordinary escape message, so `MONITOR` and `MONMSG` behave exactly as in production. `THROW` takes **one** set of parentheses. `*MOCK` sends **IMQ0101**.
 
 ### Fail on any call you didn't expect
 
-Use `BEHAVIOR(*STRICT)` on `MOCKPGM` or `MOCKSRVPGM`.
+Use `BEHAVIOR(*STRICT)` on `IMOQPGM` or `IMOQSRVPGM`.
 
-A `*LOOSE` mock (the default) answers an unmatched call by leaving parameters untouched and returning zero or blanks. A `*STRICT` mock sends **MCK0100** `Unexpected call to TAXSRV.CALCTAX('100.00', 'TX')`, which fails the test at the call that shouldn't have happened.
+A `*LOOSE` mock (the default) answers an unmatched call by leaving parameters untouched and returning zero or blanks. A `*STRICT` mock sends **IMQ0100** `Unexpected call to TAXSRV.CALCTAX('100.00', 'TX')`, which fails the test at the call that shouldn't have happened.
 
 ---
 
@@ -395,20 +407,20 @@ A `*LOOSE` mock (the default) answers an unmatched call by leaving parameters un
 Every call to a mock is recorded with a snapshot of its arguments as they arrived. Verification checks that record.
 
 ```
-MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*ONCE)
-MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*NEVER)
-MOCKVERIFY OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ PA)) TIMES(*EXACTLY 3)
-MOCKVERIFY OBJ(CUSTLKUP) ARGS((1 *LIKE 'C%')) TIMES(*ATLEAST 1)
-MOCKVERIFY OBJ(CUSTLKUP) TIMES(*ATMOST 2)
-MOCKNOMORE                    /* every recorded call has been verified */
+IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*ONCE)
+IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) TIMES(*NEVER)
+IMOQVERIFY OBJ(TAXSRV) PROC(CALCTAX) ARGS((2 *EQ PA)) TIMES(*EXACTLY 3)
+IMOQVERIFY OBJ(CUSTLKUP) ARGS((1 *LIKE 'C%')) TIMES(*ATLEAST 1)
+IMOQVERIFY OBJ(CUSTLKUP) TIMES(*ATMOST 2)
+IMOQNOMORE                    /* every recorded call has been verified */
 ```
 
 | Command | What it does |
 |---|---|
-| `MOCKVERIFY` | Sends **MCK0200** when the count of matching calls is wrong. On success, the matching calls are marked verified. |
-| `MOCKNOMORE` | Sends **MCK0201** listing any call no successful `MOCKVERIFY` covered. Use it to catch surprise interactions. |
-| `MOCKGETARG` | Returns one captured argument to a CL variable (`*CHAR 256`). Use `CALL(*FIRST\|*LAST\|n)`. |
-| `MOCKCOUNT` | Returns the number of matching calls to a CL variable (`*DEC 10 0`). |
+| `IMOQVERIFY` | Sends **IMQ0200** when the count of matching calls is wrong. On success, the matching calls are marked verified. |
+| `IMOQNOMORE` | Sends **IMQ0201** listing any call no successful `IMOQVERIFY` covered. Use it to catch surprise interactions. |
+| `IMOQGETARG` | Returns one captured argument to a CL variable (`*CHAR 256`). Use `CALL(*FIRST\|*LAST\|n)`. |
+| `IMOQCOUNT` | Returns the number of matching calls to a CL variable (`*DEC 10 0`). |
 
 ### Capturing arguments
 
@@ -417,8 +429,8 @@ When a matcher can't express the check, for example a computed value, capture th
 From an RPG test:
 
 ```rpgle
-aEqual('25.50' : mock_arg('TAXSRV' : 'CALCTAX' : MOCK_LAST : 1));
-iEqual(2 : mock_count('CUSTLKUP' : MOCK_PGM));
+aEqual('25.50' : imoq_arg('TAXSRV' : 'CALCTAX' : IMOQ_LAST : 1));
+iEqual(2 : imoq_count('CUSTLKUP' : IMOQ_PGM));
 ```
 
 From a CL driver:
@@ -426,10 +438,10 @@ From a CL driver:
 ```
              DCL        VAR(&ARG) TYPE(*CHAR) LEN(256)
              DCL        VAR(&CNT) TYPE(*DEC) LEN(10 0)
-             MOCKGETARG OBJ(CUSTLKUP) PARM(1) CALL(*LAST) RTNVAL(&ARG)
-             MOCKCOUNT  OBJ(CUSTLKUP) RTNVAL(&CNT)
-             MOCKVERIFY OBJ(CUSTLKUP) TIMES(*NEVER)
-             MONMSG     MSGID(MCK0200) EXEC(GOTO FAILED)
+             IMOQGETARG OBJ(CUSTLKUP) PARM(1) CALL(*LAST) RTNVAL(&ARG)
+             IMOQCOUNT  OBJ(CUSTLKUP) RTNVAL(&CNT)
+             IMOQVERIFY OBJ(CUSTLKUP) TIMES(*NEVER)
+             MONMSG     MSGID(IMQ0200) EXEC(GOTO FAILED)
 ```
 
 Captured values are text: numbers are normalized (`25.50`, `-1`), trailing blanks are removed, and missing arguments come back as `*OMIT` or `*NOTPASSED`.
@@ -438,21 +450,21 @@ Captured values are text: numbers are normalized (`25.50`, `-1`), trailing blank
 
 ## 8. Writing tests in RPG
 
-Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a complete working example, see `examples/QRPGLESRC/DEMOCUT_T.rpgle` (driven by `examples/QCLLESRC/MOCKDEMO.clle`). Every MOCK command runs through one of two wrappers:
+Copy `IMOQ_H` into the test module and bind service program `IMOQENG`. For a complete working example, see `examples/QRPGLESRC/DEMOCUT_T.rpgle` (driven by `examples/QCLLESRC/IMOQDEMO.clle`). Every MOCK command runs through one of two wrappers:
 
 | Procedure | On failure | Use it for |
 |---|---|---|
-| `mock(cmd)` | Sends escape **MCK0300**; RPGUnit reports the test as an error | Setup: `MOCKWHEN`, `MOCKRESET` |
-| `mock_ok(cmd)` | Returns `*off` | Assertions: `assert(mock_ok('MOCKVERIFY …') : mock_lastError())` |
-| `mock_lastError()` | n/a | The message behind the last failure, including strict-mode calls |
-| `mock_arg(obj : proc : call : parm)` | Returns `*ERROR …` | Argument capture (`MOCK_LAST` for the last call) |
-| `mock_count(obj : proc)` | Returns `-1` | Call counts (`MOCK_PGM` as the procedure for program mocks) |
+| `imoq(cmd)` | Sends escape **IMQ0300**; RPGUnit reports the test as an error | Setup: `IMOQWHEN`, `IMOQRESET` |
+| `imoq_ok(cmd)` | Returns `*off` | Assertions: `assert(imoq_ok('IMOQVERIFY …') : imoq_lastError())` |
+| `imoq_lastError()` | n/a | The message behind the last failure, including strict-mode calls |
+| `imoq_arg(obj : proc : call : parm)` | Returns `*ERROR …` | Argument capture (`IMOQ_LAST` for the last call) |
+| `imoq_count(obj : proc)` | Returns `-1` | Call counts (`IMOQ_PGM` as the procedure for program mocks) |
 
 ### Quoting inside RPG strings
 
 - Command values that contain blanks or lowercase letters need CL quotes, and inside an RPG literal each one is doubled: `SETPARM((2 ''ACME CORP''))`.
 - Split long commands with `+` at the end of the line. Leading blanks on the next line are skipped, so leave the space before the `+`.
-- Lists of entries use two sets of parentheses: `ARGS((1 *EQ C001) (2 *ANY))`. Single groups use one: `THROW(CPF9898 QCPFMSG *LIBL ''text'')`. If `mock_lastError()` starts with `CPF0006` (errors in command), check the quotes and parentheses; running the same command from a command line shows the exact problem.
+- Lists of entries use two sets of parentheses: `ARGS((1 *EQ C001) (2 *ANY))`. Single groups use one: `THROW(CPF9898 QCPFMSG *LIBL ''text'')`. If `imoq_lastError()` starts with `CPF0006` (errors in command), check the quotes and parentheses; running the same command from a command line shows the exact problem.
 
 > **Tip: stub from CL or from RPG.** The commands work the same in both. Creating mocks belongs in CL (it compiles objects). Stubbing and verification usually belong in the test procedure, next to the assertion they support.
 
@@ -462,15 +474,27 @@ Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a com
 
 | Command | Clears | Keeps | When |
 |---|---|---|---|
-| `MOCKRESET` | Stubs and recorded calls for all mocks | Mock objects and layouts | In `SETUP`, before every test |
-| `MOCKRESET SCOPE(*CALLS)` | Recorded calls | Stubs | Between the arrange and act phases of a long test |
-| `MOCKRESET OBJ(TAXSRV) SCOPE(*STUBS)` | One mock's stubs | Everything else | Switching one dependency's behavior |
-| `MOCKRMV OBJ(TAXSRV)` | The mock object and its state | Other mocks | The real object is needed again in this job |
-| `MOCKRMV` | All mocks, QTEMP tables and generated source | n/a | At the end of the driver |
+| `IMOQRESET` | Stubs and recorded calls for all mocks | Mock objects and layouts | In `SETUP`, before every test |
+| `IMOQRESET SCOPE(*CALLS)` | Recorded calls | Stubs | Between the arrange and act phases of a long test |
+| `IMOQRESET OBJ(TAXSRV) SCOPE(*STUBS)` | One mock's stubs | Everything else | Switching one dependency's behavior |
+| `IMOQRMV OBJ(TAXSRV)` | The mock object and its state | Other mocks | The real object is needed again in this job |
+| `IMOQRMV` | All mocks, QTEMP tables and generated source | n/a | At the end of the driver |
 
 - Remove mocks *after* the test program has ended. A program still active in the job keeps whatever it activated.
-- Rerunning `MOCKPGM` or `MOCKSRVPGM` for an existing name replaces the mock and forgets its stubs and calls.
-- If the driver ends without `MOCKRMV`, nothing is left behind: QTEMP is discarded with the job.
+- Rerunning `IMOQPGM` or `IMOQSRVPGM` for an existing name replaces the mock and forgets its stubs and calls.
+- If the driver ends without `IMOQRMV`, nothing is left behind: QTEMP is discarded with the job.
+
+### Creating mocks in another library
+
+Mocks go in QTEMP unless you say otherwise. `IMOQPGM` and `IMOQSRVPGM` take `LIB(name)` to create the mock object somewhere else:
+
+```
+IMOQPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND)) LIB(TESTLIB)
+```
+
+- **Safety:** iMoq gives every mock object the text `iMoq mock`, and only replaces or deletes objects with that text. If `TESTLIB` already holds a real `CUSTLKUP`, the command fails with **IMQ0016** instead of overwriting it.
+- **Library list:** the mock library must come before the real object's library, just as QTEMP must. `IMOQPGM`, `IMOQBUILD` and `IMOQCHK` check this.
+- **Lifetime:** the mock *object* stays in the library after the job ends, but its stubs and recorded calls live in QTEMP and belong to the job. Run `IMOQRMV` at the end of the driver so no mock is left behind for other jobs to call.
 
 ---
 
@@ -480,39 +504,40 @@ Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a com
 
 | What you see | Likely cause | Fix |
 |---|---|---|
-| The real program or service program runs | Its library is `*CURLIB` or a product library; a hard-coded binding; or it was activated before the mock existed | Run `MOCKCHK PGM(lib/caller)`, then follow rules 1–3 |
-| Stubbed values never show up | The matcher doesn't match what was actually passed | Inspect with `mock_arg`, or read the recorded calls in the `MOCKVERIFY` message |
-| Return value is always zero or blank | No stub matched a `*LOOSE` mock, or the export has no `MOCKPROC` | Declare `RTNTYPE`; use `*STRICT` to catch unmatched calls |
-| Signature violation when activating the code under test | It was bound against a signature the real service program no longer exports | Rebind the code under test; the mock copies the real object's current signatures |
-| `mock()` fails with CPF0006 | Command syntax: quotes or parentheses | See [Quoting inside RPG strings](#quoting-inside-rpg-strings) |
+| The real program or service program runs | Its library is `*CURLIB` or a product library; a hard-coded binding; or it was activated before the mock existed | Run `IMOQCHK PGM(lib/caller)`, then follow rules 1–3 |
+| Stubbed values never show up | The matcher doesn't match what was actually passed | Inspect with `imoq_arg`, or read the recorded calls in the `IMOQVERIFY` message |
+| Return value is always zero or blank | No stub matched a `*LOOSE` mock, or the export has no `IMOQPROC` | Declare `RTNTYPE`; use `*STRICT` to catch unmatched calls |
+| Signature violation when activating the code under test | It was bound before `IMOQBUILD` (or against another version), so its signature doesn't match the mock | Bind the code under test after `IMOQBUILD`, or create the mock with `SRCFILE(*RTV)` to copy the real object's signatures |
+| `imoq()` fails with CPF0006 | Command syntax: quotes or parentheses | See [Quoting inside RPG strings](#quoting-inside-rpg-strings) |
 | Job waits on an inquiry message | An unmonitored error in a driver run over SSH | Start drivers with `CHGJOB INQMSGRPY(*DFT)` and a program-level `MONMSG` |
 
 ### Messages
 
 | ID | Meaning |
 |---|---|
-| MCK0010 | The mock is hidden by an object earlier in the library list |
-| MCK0011 | No mock with that name exists in this job |
-| MCK0012 | Unknown export, a `PROC` given for a program mock, or a data export used as a procedure |
-| MCK0013 | The real service program or its binder source couldn't be found |
-| MCK0014 | Invalid layout or value, such as an overflow, a bad indicator, or an undeclared parameter |
-| MCK0015 | The stub didn't build. The listing is spooled; the source is in `QTEMP/MOCKSRC` |
-| MCK0020 / MCK0021 | `MOCKCHK` finding / summary |
-| MCK0100 | A strict mock received a call no stub matched |
-| MCK0101 | Sent by `THROW(*MOCK …)` |
-| MCK0200 / MCK0201 | Verification failed / unverified interactions |
-| MCK0202 | `MOCKGETARG`: no call with that number |
-| MCK0300 | A command run through `mock()` failed; the text explains why |
+| IMQ0010 | The mock is hidden by an object earlier in the library list |
+| IMQ0011 | No mock with that name exists in this job |
+| IMQ0012 | Unknown export, a `PROC` given for a program mock, or a data export used as a procedure |
+| IMQ0013 | With `SRCFILE(*RTV)` or a binder source member: the real service program or its binder source couldn't be found |
+| IMQ0014 | Invalid layout or value, such as an overflow, a bad indicator, or an undeclared parameter |
+| IMQ0015 | The stub didn't build. The listing is spooled; the source is in `QTEMP/IMOQSRC` |
+| IMQ0016 | The `LIB()` library already holds a real object with the mock's name; iMoq won't replace it |
+| IMQ0020 / IMQ0021 | `IMOQCHK` finding / summary |
+| IMQ0100 | A strict mock received a call no stub matched |
+| IMQ0101 | Sent by `THROW(*MOCK …)` |
+| IMQ0200 / IMQ0201 | Verification failed / unverified interactions |
+| IMQ0202 | `IMOQGETARG`: no call with that number |
+| IMQ0300 | A command run through `imoq()` failed; the text explains why |
 
 ### Looking inside
 
 A mock's state is kept in ordinary QTEMP tables, which you can query from the driver's job (for example with STRSQL in an interactive session that ran the commands):
 
 ```sql
-select * from qtemp.mock_call order by callid;       -- every recorded call
-select * from qtemp.mock_carg where callid = 7;     -- its arguments
-select * from qtemp.mock_stub;                         -- active stubs
-select * from qtemp.mock_sig;                          -- declared layouts
+select * from qtemp.imoq_call order by callid;       -- every recorded call
+select * from qtemp.imoq_carg where callid = 7;     -- its arguments
+select * from qtemp.imoq_stub;                         -- active stubs
+select * from qtemp.imoq_sig;                          -- declared layouts
 ```
 
 ---
@@ -523,18 +548,18 @@ The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exp
 
 | Command | Key parameters | Mockito / Moq equivalent |
 |---|---|---|
-| `MOCKPGM` | `OBJ` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` | `mock(X.class)` / `new Mock<X>(behavior)` |
-| `MOCKSRVPGM` | `OBJ` · `BEHAVIOR` · `SRCFILE(*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` | `mock(X.class)` |
-| `MOCKPROC` | `OBJ` · `PROC` · `RTNTYPE(type len dec)` · `PARMS((type len dec\|passing [passing]) …)` | – |
-| `MOCKBUILD` | `OBJ` | – |
-| `MOCKWHEN` | `OBJ` · `PROC(*PGM\|name)` · `ARGS((n matcher value) …)` · `RETURN(v …)` · `SETPARM((n value) …)` · `THROW(msgid msgf lib data)` · `TIMES(*ALWAYS\|n)` | `when().thenReturn()/thenThrow()` / `Setup().Returns()/Callback()/Throws()` |
-| `MOCKVERIFY` | `OBJ` · `PROC` · `ARGS` · `TIMES(*ONCE\|*NEVER\|*EXACTLY n\|*ATLEAST n\|*ATMOST n)` | `verify(m, times(n))` / `Verify(Times)` |
-| `MOCKNOMORE` | `OBJ(*ALL\|name)` | `verifyNoMoreInteractions()` / `VerifyNoOtherCalls()` |
-| `MOCKGETARG` | `OBJ` · `PARM(n)` · `RTNVAL(&char256)` · `PROC` · `CALL(*LAST\|*FIRST\|n)` · CL programs only | `ArgumentCaptor` |
-| `MOCKCOUNT` | `OBJ` · `RTNVAL(&dec10)` · `PROC` · `ARGS` · CL programs only | – |
-| `MOCKRESET` | `OBJ(*ALL\|name)` · `SCOPE(*ALL\|*CALLS\|*STUBS)` | `reset()` / `clearInvocations()` |
-| `MOCKRMV` | `OBJ(*ALL\|name)` | – |
-| `MOCKCHK` | `PGM(*NONE\|lib/name)` | – |
+| `IMOQPGM` | `OBJ` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` · `LIB(QTEMP\|name)` | `mock(X.class)` / `new Mock<X>(behavior)` |
+| `IMOQSRVPGM` | `OBJ` · `BEHAVIOR` · `SRCFILE(*NONE\|*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` · `SIGNATURE(*GEN\|'text')` · `LIB(QTEMP\|name)` | `mock(X.class)` |
+| `IMOQPROC` | `OBJ` · `PROC` · `RTNTYPE(type len dec)` · `PARMS((type len dec\|passing [passing]) …)` | – |
+| `IMOQBUILD` | `OBJ` | – |
+| `IMOQWHEN` | `OBJ` · `PROC(*PGM\|name)` · `ARGS((n matcher value) …)` · `RETURN(v …)` · `SETPARM((n value) …)` · `THROW(msgid msgf lib data)` · `TIMES(*ALWAYS\|n)` | `when().thenReturn()/thenThrow()` / `Setup().Returns()/Callback()/Throws()` |
+| `IMOQVERIFY` | `OBJ` · `PROC` · `ARGS` · `TIMES(*ONCE\|*NEVER\|*EXACTLY n\|*ATLEAST n\|*ATMOST n)` | `verify(m, times(n))` / `Verify(Times)` |
+| `IMOQNOMORE` | `OBJ(*ALL\|name)` | `verifyNoMoreInteractions()` / `VerifyNoOtherCalls()` |
+| `IMOQGETARG` | `OBJ` · `PARM(n)` · `RTNVAL(&char256)` · `PROC` · `CALL(*LAST\|*FIRST\|n)` · CL programs only | `ArgumentCaptor` |
+| `IMOQCOUNT` | `OBJ` · `RTNVAL(&dec10)` · `PROC` · `ARGS` · CL programs only | – |
+| `IMOQRESET` | `OBJ(*ALL\|name)` · `SCOPE(*ALL\|*CALLS\|*STUBS)` | `reset()` / `clearInvocations()` |
+| `IMOQRMV` | `OBJ(*ALL\|name)` | – |
+| `IMOQCHK` | `PGM(*NONE\|lib/name)` | – |
 
 ### Limits
 
@@ -545,4 +570,4 @@ The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exp
 
 ---
 
-IBMIMOCK is developed in the [IBMiMock repository](../README.md). See [Installing IBMIMOCK](#2-installing-ibmimock) to build it and run its self-tests.
+iMoq is developed in the [IBMiMock repository](../README.md). See [Installing iMoq](#2-installing-imoq) to build it and run its self-tests.

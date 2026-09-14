@@ -1,0 +1,39 @@
+/* ---------------------------------------------------------------- */
+/* EXSERIES - Different answers on successive calls                 */
+/*                                                                  */
+/* Driver for test program EXSERIES_T.                              */
+/*   CRTBNDCL PGM(IMOQ/EXSERIES) SRCFILE(IMOQ/QCLLESRC)             */
+/*   CALL IMOQ/EXSERIES PARM('IMOQ')                                */
+/* ---------------------------------------------------------------- */
+             PGM        PARM(&LIB)
+             DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
+             DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
+
+/* iMoq and the example source are in &LIB                          */
+             CHGCURLIB  CURLIB(&LIB)
+
+/* 1. Create the mock                                               */
+             IMOQSRVPGM OBJ(EXPRICE)
+             IMOQPROC   OBJ(EXPRICE) PROC(EX_PRICE) +
+                          RTNTYPE(*PACKED 7 2) PARMS((*CHAR 5 *CONST))
+             IMOQBUILD  OBJ(EXPRICE)
+
+/* 2. Compile the test program                                      */
+             CRTRPGMOD  MODULE(QTEMP/EXSERIES_T) SRCFILE(&LIB/QRPGLESRC)
+             CRTPGM     PGM(QTEMP/EXSERIES_T) MODULE(QTEMP/EXSERIES_T) +
+                          BNDSRVPGM((*LIBL/EXPRICE) (*LIBL/IMOQENG)) +
+                          ACTGRP(*NEW)
+
+/* 3. Run it. A failed expect() arrives as escape message CPF9898.  */
+             CALL       PGM(QTEMP/EXSERIES_T)
+             MONMSG     MSGID(CPF9898) EXEC(DO)
+             RCVMSG     MSGTYPE(*EXCP) MSG(&MSG)
+             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXSERIES +
+                          failed:' *BCAT &MSG) MSGTYPE(*ESCAPE)
+             ENDDO
+
+/* 4. Remove the mock                                               */
+             IMOQRMV
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('EXSERIES +
+                          passed') MSGTYPE(*COMP)
+             ENDPGM

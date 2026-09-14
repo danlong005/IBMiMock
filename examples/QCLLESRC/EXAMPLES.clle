@@ -1,112 +1,51 @@
 /* ---------------------------------------------------------------- */
-/* EXAMPLES - Run the IBMiMock feature examples                     */
+/* EXAMPLES - Run every iMoq feature example                        */
 /*                                                                  */
-/*   CALL EXAMPLES PARM('IBMIMOCK' 'SRCLIB')                        */
-/*   1: IBMIMOCK library, also used for the example programs        */
-/*      (default: current library)                                  */
-/*   2: library holding the source files (default: parameter 1)     */
+/*   CRTBNDCL PGM(IMOQ/EXAMPLES) SRCFILE(IMOQ/QCLLESRC)             */
+/*   CALL IMOQ/EXAMPLES PARM('IMOQ')                                */
 /*                                                                  */
-/* This is a typical test driver:                                   */
-/*   1. put the library behind QTEMP in the library list            */
-/*   2. create the mocks (before anything uses them)                */
-/*   3. compile and run the tests (here: one example per feature)   */
-/*   4. remove the mocks                                            */
-/* Every example reports "ok" or "FAIL" as a diagnostic message.    */
+/* Compiles and calls each example's driver, then reports "ok" or   */
+/* "FAIL" for each one as a diagnostic message.                     */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&PLIB &PSRCLIB)
-             DCL        VAR(&PLIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&PSRCLIB) TYPE(*CHAR) LEN(10)
+             PGM        PARM(&LIB)
              DCL        VAR(&LIB) TYPE(*CHAR) LEN(10)
-             DCL        VAR(&SRCLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&EX) TYPE(*CHAR) LEN(10)
              DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
-             DCL        VAR(&LINE) TYPE(*CHAR) LEN(512)
              DCL        VAR(&FAILS) TYPE(*INT) LEN(4)
              DCL        VAR(&NBR) TYPE(*CHAR) LEN(12)
 
-             MONMSG     MSGID(CPF0000 MCH0000 RNS0000 MCK0000) +
-                          EXEC(GOTO CMDLBL(FAIL))
-
              CHGJOB     INQMSGRPY(*DFT)
-             RTVJOBA    CURLIB(&LIB)
-             CHGVAR     VAR(&LIB) VALUE(&PLIB)
-             MONMSG     MSGID(MCH3601)
-             CHGVAR     VAR(&SRCLIB) VALUE(&LIB)
-             CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
-             MONMSG     MSGID(MCH3601)
 
-/* Copybooks for the examples */
-             DLTF       FILE(QTEMP/MOCKINC)
-             MONMSG     MSGID(CPF2105)
-             CRTSRCPF   FILE(QTEMP/MOCKINC) RCDLEN(240)
-             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
-                          FROMMBR(MOCK_H)
-             CPYSRCF    FROMFILE(&SRCLIB/QRPGLESRC) TOFILE(QTEMP/MOCKINC) +
-                          FROMMBR(EXAMPLE_H)
-
-/* 1. The library must come after QTEMP (rule 1) */
-             CHGCURLIB  CURLIB(*CRTDFT)
-             RMVLIBLE   LIB(&LIB)
-             MONMSG     MSGID(CPF2104)
-             ADDLIBLE   LIB(&LIB) POSITION(*LAST)
-
-/* 2. Mocks. None of these objects exists for real.                 */
-             MOCKPGM    OBJ(EXCUST) PARMS((*CHAR 5) (*CHAR 30) (*IND))
-             MOCKPGM    OBJ(EXAUDIT) PARMS((*CHAR 20)) BEHAVIOR(*STRICT)
-             MOCKSRVPGM OBJ(EXPRICE) SRCFILE(&SRCLIB/QSRVSRC) +
-                          SRCMBR(EXPRICE)
-             MOCKPROC   OBJ(EXPRICE) PROC(EX_PRICE) +
-                          RTNTYPE(*PACKED 7 2) PARMS((*CHAR 5 *CONST))
-             MOCKPROC   OBJ(EXPRICE) PROC(EX_DISCOUNT) +
-                          RTNTYPE(*PACKED 7 2) +
-                          PARMS((*PACKED 7 2 *CONST) (*CHAR 10 *CONST))
-             MOCKPROC   OBJ(EXPRICE) PROC(EX_LOG) +
-                          PARMS((*CHAR 50 *CONST))
-             MOCKBUILD  OBJ(EXPRICE)
-
-/* 3. One example per feature */
              CHGVAR     VAR(&EX) VALUE('EXPGM')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXRETURN')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXMATCH')
-             CALLSUBR   SUBR(RUNRPG)
-             CHGVAR     VAR(&EX) VALUE('EXOVERRIDE')
-             CALLSUBR   SUBR(RUNRPG)
-             CHGVAR     VAR(&EX) VALUE('EXSEQUENCE')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
+             CHGVAR     VAR(&EX) VALUE('EXNEWEST')
+             CALLSUBR   SUBR(RUN)
+             CHGVAR     VAR(&EX) VALUE('EXSERIES')
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXTIMES')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXTHROW')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXSTRICT')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXVERIFY')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXNOMORE')
-             CALLSUBR   SUBR(RUNRPG)
-             CHGVAR     VAR(&EX) VALUE('EXCAPTURE')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
+             CHGVAR     VAR(&EX) VALUE('EXCAPT')
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXOMIT')
-             CALLSUBR   SUBR(RUNRPG)
+             CALLSUBR   SUBR(RUN)
              CHGVAR     VAR(&EX) VALUE('EXRESET')
-             CALLSUBR   SUBR(RUNRPG)
-             CHGVAR     VAR(&EX) VALUE('EXFAILMSG')
-             CALLSUBR   SUBR(RUNRPG)
-             CALLSUBR   SUBR(RUNCL)
-
-/* MOCKCHK: the example programs bind EXPRICE through *LIBL */
-             CHGVAR     VAR(&EX) VALUE('MOCKCHK')
-             MOCKCHK    PGM(&LIB/EXRETURN)
-             MONMSG     MSGID(MCK0021) EXEC(DO)
-             RCVMSG     MSGTYPE(*EXCP) RMV(*YES) MSG(&MSG)
-             CALLSUBR   SUBR(FAILED)
-             GOTO       CMDLBL(CLEANUP)
-             ENDDO
-             CALLSUBR   SUBR(PASSED)
-
-/* 4. Remove the mocks */
- CLEANUP:    MOCKRMV
+             CALLSUBR   SUBR(RUN)
+             CHGVAR     VAR(&EX) VALUE('EXERRMSG')
+             CALLSUBR   SUBR(RUN)
+             CHGVAR     VAR(&EX) VALUE('EXCL')
+             CALLSUBR   SUBR(RUN)
 
              IF         COND(&FAILS *GT 0) THEN(DO)
              CHGVAR     VAR(&NBR) VALUE(%CHAR(&FAILS))
@@ -118,61 +57,29 @@
                           all examples passed') MSGTYPE(*COMP)
              RETURN
 
- FAIL:       RCVMSG     MSGTYPE(*EXCP) RMV(*NO) MSG(&MSG)
-             MONMSG     MSGID(CPF0000)
-             SNDPGMMSG  MSGID(CPF9898) MSGF(QCPFMSG) MSGDTA('EXAMPLES +
-                          stopped:' *BCAT &MSG) MSGTYPE(*ESCAPE)
-             MONMSG     MSGID(CPF0000)
-             RETURN
-
-/* ---- compile and run one RPG example ------------------------------ */
-             SUBR       SUBR(RUNRPG)
-             CRTRPGMOD  MODULE(QTEMP/&EX) SRCFILE(&SRCLIB/QRPGLESRC) +
-                          SRCMBR(&EX) OUTPUT(*NONE)
-             MONMSG     MSGID(RNS9309) EXEC(DO)
-             CHGVAR     VAR(&MSG) VALUE('did not compile')
+/* ---- compile and call one driver --------------------------------- */
+             SUBR       SUBR(RUN)
+             CRTBNDCL   PGM(&LIB/&EX) SRCFILE(&LIB/QCLLESRC) +
+                          SRCMBR(&EX) REPLACE(*YES)
+             MONMSG     MSGID(CPF0000) EXEC(DO)
+             CHGVAR     VAR(&MSG) VALUE('driver did not compile')
              CALLSUBR   SUBR(FAILED)
              RTNSUBR
              ENDDO
-             CRTPGM     PGM(&LIB/&EX) MODULE(QTEMP/&EX) +
-                          BNDSRVPGM((*LIBL/EXPRICE) (&LIB/MOCKENG)) +
-                          ACTGRP(*NEW)
-             DLTMOD     MODULE(QTEMP/&EX)
-             MONMSG     MSGID(CPF0000)
-             CALL       PGM(&LIB/&EX)
-             MONMSG     MSGID(CPF0000 MCK0000 MCH0000 CEE0000 +
-                          RNX0000) EXEC(DO)
+             CALL       PGM(&LIB/&EX) PARM(&LIB)
+             MONMSG     MSGID(CPF0000 IMQ0000 MCH0000 CEE0000 +
+                          RNX0000 RNS0000) EXEC(DO)
              RCVMSG     MSGTYPE(*EXCP) RMV(*YES) MSG(&MSG)
              CALLSUBR   SUBR(FAILED)
              RTNSUBR
              ENDDO
-             CALLSUBR   SUBR(PASSED)
-             ENDSUBR
-
-/* ---- compile and run the CL example ------------------------------- */
-             SUBR       SUBR(RUNCL)
-             CHGVAR     VAR(&EX) VALUE('EXCL')
-             CRTBNDCL   PGM(&LIB/EXCL) SRCFILE(&SRCLIB/QCLLESRC) +
-                          SRCMBR(EXCL) REPLACE(*YES)
-             CALL       PGM(&LIB/EXCL)
-             MONMSG     MSGID(CPF0000 MCK0000) EXEC(DO)
-             RCVMSG     MSGTYPE(*EXCP) RMV(*YES) MSG(&MSG)
-             CALLSUBR   SUBR(FAILED)
-             RTNSUBR
-             ENDDO
-             CALLSUBR   SUBR(PASSED)
-             ENDSUBR
-
-             SUBR       SUBR(PASSED)
              SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('ok   ' +
                           *CAT &EX) MSGTYPE(*DIAG)
              ENDSUBR
 
              SUBR       SUBR(FAILED)
-             CHGVAR     VAR(&LINE) VALUE('FAIL ' *CAT &EX *BCAT '-' +
-                          *BCAT &MSG)
-             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&LINE) +
-                          MSGTYPE(*DIAG)
+             SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA('FAIL ' +
+                          *CAT &EX *BCAT '-' *BCAT &MSG) MSGTYPE(*DIAG)
              CHGVAR     VAR(&FAILS) VALUE(&FAILS + 1)
              ENDSUBR
              ENDPGM

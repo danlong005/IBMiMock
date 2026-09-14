@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">iMoq logo</title>
+  <desc id="desc">A teal command-prompt inspired icon and the iMoq wordmark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="28" y1="28" x2="252" y2="252" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10263B"/>
+      <stop offset="1" stop-color="#0B1523"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="45" y1="42" x2="237" y2="238" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4FE3C1"/>
+      <stop offset="1" stop-color="#16A7C9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="400" rx="48" fill="#F7FAFC"/>
+  <rect x="64" y="72" width="256" height="256" rx="56" fill="url(#bg)"/>
+  <path d="M125 151l42 42-42 42" fill="none" stroke="url(#accent)" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M193 237h57" fill="none" stroke="#DDFCF5" stroke-width="22" stroke-linecap="round"/>
+  <circle cx="252" cy="142" r="10" fill="#4FE3C1"/>
+  <text x="366" y="243" fill="#10263B" font-family="Inter, Avenir Next, Helvetica Neue, Arial, sans-serif" font-size="174" font-weight="700" letter-spacing="-9">iMoq</text>
+  <rect x="378" y="278" width="510" height="9" rx="4.5" fill="#16A7C9"/>
+</svg>

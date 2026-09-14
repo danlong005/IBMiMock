@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// DEMOSRV - IBMIMOCK demo dependency (*SRVPGM): tax service.
+// DEMOSRV - iMoq demo dependency (*SRVPGM): tax service.
 // ------------------------------------------------------------------
 ctl-opt nomain;
 

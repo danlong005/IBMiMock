@@ -1,0 +1,2035 @@
+**free
+// ------------------------------------------------------------------
+// IMOQENG - iMoq engine: mock state (QTEMP tables), stub runtime,
+//           stubbing, verification and the public test API.
+// Module of service program IMOQENG (ACTGRP iMoq).
+// ------------------------------------------------------------------
+ctl-opt nomain option(*srcstmt:*nodebugio) decprec(63);
+
+/copy QTEMP/IMOQINC,IMOQENG_H
+
+exec sql set option commit = *none, naming = *sql,
+  closqlcsr = *endactgrp, datfmt = *iso, timfmt = *iso;
+
+dcl-c LOWER 'abcdefghijklmnopqrstuvwxyz';
+dcl-c UPPER 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+dcl-c MAXCALLS 5000;
+dcl-c MAXSTUBS 500;
+
+dcl-ds psds psds qualified;
+  excType char(3) pos(40);
+  excNum char(4) pos(43);
+  lib char(10) pos(81);
+end-ds;
+
+dcl-ds matcher_t qualified template;
+  parmNo int(10);
+  matcher char(10);
+  val varchar(1024);
+end-ds;
+
+dcl-s gTablesOk ind;
+dcl-s gLastErr varchar(512);
+
+dcl-ds apiErr_t qualified template;
+  bytesProv int(10);
+  bytesAvail int(10);
+  msgId char(7);
+  rsv char(1);
+end-ds;
+
+dcl-pr qcmdexc extpgm('QCMDEXC');
+  cmd char(3000) const options(*varsize);
+  len packed(15:5) const;
+end-pr;
+
+dcl-pr qmhsndpm extpgm('QMHSNDPM');
+  msgId char(7) const;
+  msgf char(20) const;
+  msgDta char(512) const;
+  msgDtaLen int(10) const;
+  msgType char(10) const;
+  callStk char(10) const;
+  callStkCtr int(10) const;
+  msgKey char(4);
+  errCode likeds(apiErr_t);
+end-pr;
+
+dcl-pr qusrobjd extpgm('QUSROBJD');
+  rcv char(90);
+  rcvLen int(10) const;
+  format char(8) const;
+  objQual char(20) const;
+  objType char(10) const;
+  errCode likeds(apiErr_t);
+end-pr;
+
+// ==================================================================
+// Error helpers
+// ==================================================================
+dcl-proc clearErr;
+  dcl-pi *n;
+    err likeds(imoq_err_t);
+  end-pi;
+  err.msgId = ' ';
+  err.msgfLib = psds.lib;
+  err.text = ' ';
+end-proc;
+
+dcl-proc setErr;
+  dcl-pi *n;
+    err likeds(imoq_err_t);
+    msgId char(7) const;
+    text varchar(512) const;
+  end-pi;
+  err.msgId = msgId;
+  err.msgfLib = psds.lib;
+  err.text = text;
+  gLastErr = text;
+end-proc;
+
+dcl-proc sqlFailText;
+  dcl-pi *n varchar(512);
+    what varchar(100) const;
+  end-pi;
+  dcl-s code int(10);
+  dcl-s state char(5);
+  dcl-s t varchar(400);
+  code = sqlcode;
+  state = sqlstate;
+  exec sql get diagnostics condition 1 :t = message_text;
+  return what + ' failed (SQLCODE ' + %char(code) + ', SQLSTATE '
+       + state + '): ' + t;
+end-proc;
+
+// ==================================================================
+// State tables in QTEMP
+// ==================================================================
+dcl-proc runDdl;
+  dcl-pi *n;
+    stmt varchar(2000) const;
+  end-pi;
+  dcl-s s varchar(2000);
+  s = stmt;
+  exec sql execute immediate :s;
+end-proc;
+
+dcl-proc ensureTables;
+  if gTablesOk;
+    return;
+  endif;
+  runDdl('CREATE TABLE QTEMP.IMOQ_OBJ (OBJ CHAR(10) NOT NULL, '
+       + 'OBJTYPE CHAR(7) NOT NULL, BEHAVIOR CHAR(7) NOT NULL, '
+       + 'REALLIB CHAR(10) NOT NULL, BUILT CHAR(1) NOT NULL, '
+       + 'EXPMODE CHAR(4) NOT NULL, SIGNATURE VARCHAR(16) NOT NULL, '
+       + 'MOCKLIB CHAR(10) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_PROC (OBJ CHAR(10) NOT NULL, '
+       + 'PROC VARCHAR(4096) NOT NULL, SEQ INT NOT NULL, '
+       + 'KIND CHAR(4) NOT NULL, DATASIZE INT NOT NULL, '
+       + 'DECLARED CHAR(1) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_SIG (OBJ CHAR(10) NOT NULL, '
+       + 'PROC VARCHAR(4096) NOT NULL, PARMNO SMALLINT NOT NULL, '
+       + 'TYPE CHAR(10) NOT NULL, LEN INT NOT NULL, DEC INT NOT NULL, '
+       + 'PASSING CHAR(6) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_STUB (STUBID INT NOT NULL, '
+       + 'OBJ CHAR(10) NOT NULL, PROC VARCHAR(4096) NOT NULL, '
+       + 'TIMESLEFT INT NOT NULL, USED INT NOT NULL, '
+       + 'THRID CHAR(7) NOT NULL, THRMSGF CHAR(10) NOT NULL, '
+       + 'THRLIB CHAR(10) NOT NULL, THRDTA VARCHAR(512) NOT NULL, '
+       + 'RTNCNT INT NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_SARG (STUBID INT NOT NULL, '
+       + 'PARMNO SMALLINT NOT NULL, MATCHER CHAR(10) NOT NULL, '
+       + 'VAL VARCHAR(1024) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_SRTN (STUBID INT NOT NULL, '
+       + 'SEQ INT NOT NULL, VAL VARCHAR(1024) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_SSET (STUBID INT NOT NULL, '
+       + 'PARMNO SMALLINT NOT NULL, VAL VARCHAR(1024) NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_CALL (CALLID INT NOT NULL, '
+       + 'OBJ CHAR(10) NOT NULL, PROC VARCHAR(4096) NOT NULL, '
+       + 'PARMCNT INT NOT NULL, STUBID INT NOT NULL, '
+       + 'VERIFIED CHAR(1) NOT NULL, TS TIMESTAMP NOT NULL)');
+  runDdl('CREATE TABLE QTEMP.IMOQ_CARG (CALLID INT NOT NULL, '
+       + 'PARMNO SMALLINT NOT NULL, STATE CHAR(1) NOT NULL, '
+       + 'VAL VARCHAR(1024) NOT NULL)');
+  gTablesOk = *on;
+end-proc;
+
+dcl-proc dropTables;
+  runDdl('DROP TABLE QTEMP.IMOQ_OBJ');
+  runDdl('DROP TABLE QTEMP.IMOQ_PROC');
+  runDdl('DROP TABLE QTEMP.IMOQ_SIG');
+  runDdl('DROP TABLE QTEMP.IMOQ_STUB');
+  runDdl('DROP TABLE QTEMP.IMOQ_SARG');
+  runDdl('DROP TABLE QTEMP.IMOQ_SRTN');
+  runDdl('DROP TABLE QTEMP.IMOQ_SSET');
+  runDdl('DROP TABLE QTEMP.IMOQ_CALL');
+  runDdl('DROP TABLE QTEMP.IMOQ_CARG');
+  runDdl('DROP ALIAS QTEMP.IMOQ_SRCW');
+  runDdl('DROP ALIAS QTEMP.IMOQ_BNDR');
+  gTablesOk = *off;
+end-proc;
+
+// ------------------------------------------------------------------
+// Delete stubs (and their children) for obj/proc ('' = all procs)
+// ------------------------------------------------------------------
+dcl-proc deleteStubs;
+  dcl-pi *n;
+    obj char(10) const;
+  end-pi;
+  exec sql delete from qtemp.imoq_sarg where stubid in
+    (select stubid from qtemp.imoq_stub where obj = :obj or :obj = '*ALL');
+  exec sql delete from qtemp.imoq_srtn where stubid in
+    (select stubid from qtemp.imoq_stub where obj = :obj or :obj = '*ALL');
+  exec sql delete from qtemp.imoq_sset where stubid in
+    (select stubid from qtemp.imoq_stub where obj = :obj or :obj = '*ALL');
+  exec sql delete from qtemp.imoq_stub where obj = :obj or :obj = '*ALL';
+end-proc;
+
+dcl-proc deleteCalls;
+  dcl-pi *n;
+    obj char(10) const;
+  end-pi;
+  exec sql delete from qtemp.imoq_carg where callid in
+    (select callid from qtemp.imoq_call where obj = :obj or :obj = '*ALL');
+  exec sql delete from qtemp.imoq_call where obj = :obj or :obj = '*ALL';
+end-proc;
+
+dcl-proc forgetObj;
+  dcl-pi *n;
+    obj char(10) const;
+  end-pi;
+  deleteStubs(obj);
+  deleteCalls(obj);
+  exec sql delete from qtemp.imoq_sig where obj = :obj or :obj = '*ALL';
+  exec sql delete from qtemp.imoq_proc where obj = :obj or :obj = '*ALL';
+  exec sql delete from qtemp.imoq_obj where obj = :obj or :obj = '*ALL';
+end-proc;
+
+// ==================================================================
+// Command parameter (list) helpers
+// ==================================================================
+dcl-proc lstCount;
+  dcl-pi *n int(10);
+    p pointer value;
+  end-pi;
+  dcl-s n int(5) based(p);
+  if p = *null;
+    return 0;
+  endif;
+  return n;
+end-proc;
+
+// entry i (1-based) of a list of mixed lists
+dcl-proc lstEntry;
+  dcl-pi *n pointer;
+    p pointer value;
+    i int(10) value;
+  end-pi;
+  dcl-s q pointer;
+  dcl-s off int(5) based(q);
+  q = p + 2 * i;
+  return p + off;
+end-proc;
+
+// value with a 2-byte length prefix (VARY(*YES))
+dcl-proc varyText;
+  dcl-pi *n varchar(4096);
+    p pointer value;
+    maxLen int(10) value;
+  end-pi;
+  dcl-s n int(5) based(p);
+  dcl-s q pointer;
+  dcl-s c char(4096) based(q);
+  dcl-s len int(10);
+  len = n;
+  if len <= 0;
+    return '';
+  endif;
+  if len > maxLen;
+    len = maxLen;
+  endif;
+  q = p + 2;
+  return %subst(c : 1 : len);
+end-proc;
+
+dcl-proc charAt;
+  dcl-pi *n varchar(256);
+    p pointer value;
+    len int(10) value;
+  end-pi;
+  dcl-s c char(256) based(p);
+  return %subst(c : 1 : len);
+end-proc;
+
+dcl-proc int2At;
+  dcl-pi *n int(10);
+    p pointer value;
+  end-pi;
+  dcl-s n int(5) based(p);
+  return n;
+end-proc;
+
+dcl-proc int4At;
+  dcl-pi *n int(10);
+    p pointer value;
+  end-pi;
+  dcl-s n int(10) based(p);
+  return n;
+end-proc;
+
+// ------------------------------------------------------------------
+// Read one layout entry: TYPE(*CHAR 10) LEN(*INT4) DEC(*INT4)
+//                        [PASSING(*CHAR 6)]
+// ------------------------------------------------------------------
+dcl-proc readDef;
+  dcl-pi *n;
+    e pointer value;
+    def likeds(imoq_def_t);
+    withPassing ind const;
+  end-pi;
+  clear def;
+  def.type = charAt(e + 2 : 10);
+  def.len = int4At(e + 12);
+  def.dec = int4At(e + 16);
+  def.passing = '*REF';
+  if withPassing;
+    def.passing = charAt(e + 20 : 6);
+    // (*CHAR 10 *CONST): passing given in the decimal positions element
+    select;
+    when def.dec = -1;
+      def.passing = '*CONST';
+      def.dec = 0;
+    when def.dec = -2;
+      def.passing = '*VALUE';
+      def.dec = 0;
+    when def.dec = -3;
+      def.passing = '*REF';
+      def.dec = 0;
+    endsl;
+  endif;
+end-proc;
+
+// ==================================================================
+// Mock metadata lookups
+// ==================================================================
+dcl-proc objInfo;
+  dcl-pi *n ind;
+    obj char(10) const;
+    objType char(7);
+    behavior char(7);
+    built char(1);
+    realLib char(10);
+  end-pi;
+  exec sql select objtype, behavior, built, reallib
+             into :objType, :behavior, :built, :realLib
+             from qtemp.imoq_obj where obj = :obj
+             fetch first 1 row only;
+  return sqlcode = 0;
+end-proc;
+
+dcl-proc label;
+  dcl-pi *n varchar(4200);
+    obj char(10) const;
+    proc varchar(4096) const;
+  end-pi;
+  if proc = '*PGM';
+    return %trim(obj);
+  endif;
+  return %trim(obj) + '.' + proc;
+end-proc;
+
+// Resolve the PROC parameter against the mock's exports
+dcl-proc resolveProc;
+  dcl-pi *n ind;
+    obj char(10) const;
+    objType char(7) const;
+    procIn varchar(4096) const;
+    procOut varchar(4096);
+    kind char(4);
+    declared char(1);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s n int(10);
+  dcl-s p varchar(4096);
+
+  p = %trim(procIn);
+  if objType = '*PGM';
+    if p <> '' and p <> '*PGM';
+      setErr(err : 'IMQ0012' : 'Mock ' + %trim(obj) + ' is a program; '
+           + 'omit the PROC parameter (PROC(*PGM))');
+      return *off;
+    endif;
+    procOut = '*PGM';
+    kind = 'PROC';
+    declared = 'Y';
+    return *on;
+  endif;
+
+  if p = '' or p = '*PGM';
+    setErr(err : 'IMQ0012' : 'PROC is required for service program mock '
+         + %trim(obj));
+    return *off;
+  endif;
+
+  exec sql select proc, kind, declared into :procOut, :kind, :declared
+             from qtemp.imoq_proc where obj = :obj and proc = :p
+             fetch first 1 row only;
+  if sqlcode = 0;
+    return *on;
+  endif;
+
+  exec sql select count(*) into :n from qtemp.imoq_proc
+             where obj = :obj and upper(proc) = upper(:p);
+  if n = 1;
+    exec sql select proc, kind, declared into :procOut, :kind, :declared
+               from qtemp.imoq_proc
+               where obj = :obj and upper(proc) = upper(:p)
+               fetch first 1 row only;
+    return *on;
+  endif;
+
+  setErr(err : 'IMQ0012' : %trim(obj) + ' does not export ' + p);
+  return *off;
+end-proc;
+
+// ------------------------------------------------------------------
+// addExport - for a SRCFILE(*NONE) mock, IMOQPROC defines the export
+// ------------------------------------------------------------------
+dcl-proc addExport;
+  dcl-pi *n ind;
+    obj char(10) const;
+    procIn varchar(4096) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s mode char(4);
+  dcl-s p varchar(4096);
+  dcl-s n int(10);
+  dcl-s seq int(10);
+
+  exec sql select expmode into :mode from qtemp.imoq_obj
+            where obj = :obj;
+  if sqlcode <> 0 or mode <> 'PROC';
+    return *on;
+  endif;
+
+  p = %trim(procIn);
+  if p = '' or p = '*PGM';
+    setErr(err : 'IMQ0012' : 'PROC is required for service program mock '
+         + %trim(obj));
+    return *off;
+  endif;
+  if %scan('''' : p) > 0 or %scan('"' : p) > 0 or %len(p) > 180;
+    setErr(err : 'IMQ0014' : 'PROC must be an export name of at most 180 '
+         + 'characters without quotes');
+    return *off;
+  endif;
+
+  exec sql select count(*) into :n from qtemp.imoq_proc
+            where obj = :obj and proc = :p;
+  if n = 0;
+    exec sql select coalesce(max(seq), 0) + 1 into :seq
+               from qtemp.imoq_proc where obj = :obj;
+    exec sql insert into qtemp.imoq_proc
+      values(:obj, :p, :seq, 'PROC', 0, 'N');
+  endif;
+  return *on;
+end-proc;
+
+dcl-proc loadSig;
+  dcl-pi *n;
+    obj char(10) const;
+    proc varchar(4096) const;
+    defs likeds(imoq_def_t) dim(64);
+    nDefs int(10);
+    rtnDef likeds(imoq_def_t);
+    hasRtn ind;
+  end-pi;
+  dcl-s parmNo int(5);
+  dcl-s type char(10);
+  dcl-s len int(10);
+  dcl-s dec int(10);
+  dcl-s passing char(6);
+
+  clear defs;
+  clear rtnDef;
+  nDefs = 0;
+  hasRtn = *off;
+
+  exec sql declare cSig cursor for
+    select parmno, type, len, dec, passing from qtemp.imoq_sig
+     where obj = :obj and proc = :proc order by parmno;
+  exec sql open cSig;
+  dow sqlcode = 0;
+    exec sql fetch next from cSig
+      into :parmNo, :type, :len, :dec, :passing;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    if parmNo = 0;
+      hasRtn = *on;
+      rtnDef.type = type;
+      rtnDef.len = len;
+      rtnDef.dec = dec;
+      rtnDef.passing = passing;
+    elseif parmNo <= IMOQ_MAXP;
+      defs(parmNo).type = type;
+      defs(parmNo).len = len;
+      defs(parmNo).dec = dec;
+      defs(parmNo).passing = passing;
+      if parmNo > nDefs;
+        nDefs = parmNo;
+      endif;
+    endif;
+  enddo;
+  exec sql close cSig;
+end-proc;
+
+dcl-proc insertSig;
+  dcl-pi *n;
+    obj char(10) const;
+    proc varchar(4096) const;
+    parmNo int(5) const;
+    def likeds(imoq_def_t) const;
+  end-pi;
+  dcl-s type char(10);
+  dcl-s len int(10);
+  dcl-s dec int(10);
+  dcl-s passing char(6);
+  type = def.type;
+  len = def.len;
+  dec = def.dec;
+  passing = def.passing;
+  exec sql insert into qtemp.imoq_sig
+    values(:obj, :proc, :parmNo, :type, :len, :dec, :passing);
+end-proc;
+
+// Validate that text can be stored in a value of this layout
+dcl-proc canEncode;
+  dcl-pi *n ind;
+    def likeds(imoq_def_t) const;
+    text varchar(1024) const;
+    msg varchar(256);
+  end-pi;
+  dcl-s p pointer;
+  dcl-s ok ind;
+  p = %alloc(def.len + 16);
+  ok = imoq_encode(p : def : text : msg);
+  dealloc(n) p;
+  return ok;
+end-proc;
+
+// ==================================================================
+// Matchers passed on a command: ARGS((parmNo matcher value) ...)
+// ==================================================================
+dcl-proc readMatchers;
+  dcl-pi *n ind;
+    blob pointer value;
+    m likeds(matcher_t) dim(64);
+    nM int(10);
+    defs likeds(imoq_def_t) dim(64) const;
+    nDefs int(10) const;
+    lbl varchar(4200) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s i int(10);
+  dcl-s e pointer;
+  dcl-s msg varchar(256);
+
+  clear m;
+  nM = lstCount(blob);
+  if nM > IMOQ_MAXP;
+    setErr(err : 'IMQ0014' : 'At most 64 argument matchers are allowed');
+    return *off;
+  endif;
+  for i = 1 to nM;
+    e = lstEntry(blob : i);
+    m(i).parmNo = int2At(e + 2);
+    m(i).matcher = %xlate(LOWER : UPPER : charAt(e + 4 : 10));
+    m(i).val = varyText(e + 14 : 256);
+    if m(i).parmNo < 1 or m(i).parmNo > IMOQ_MAXP;
+      setErr(err : 'IMQ0014' : 'ARGS entry ' + %char(i)
+           + ': parameter number must be 1 to 64');
+      return *off;
+    endif;
+    if not imoq_validMatcher(m(i).matcher);
+      setErr(err : 'IMQ0014' : 'ARGS entry ' + %char(i) + ': '
+           + %trim(m(i).matcher) + ' is not a valid matcher');
+      return *off;
+    endif;
+    if m(i).matcher = '*ANY' or m(i).matcher = '*OMIT'
+       or m(i).matcher = '*NOTPASSED';
+      iter;
+    endif;
+    if m(i).parmNo > nDefs;
+      setErr(err : 'IMQ0014' : 'ARGS entry ' + %char(i) + ': parameter '
+           + %char(m(i).parmNo) + ' of ' + lbl + ' is not declared. '
+           + 'Declare its layout with PARMS so values can be compared');
+      return *off;
+    endif;
+    if imoq_isNumeric(defs(m(i).parmNo).type)
+       and m(i).matcher <> '*BLANK' and m(i).matcher <> '*LIKE';
+      if not canEncode(defs(m(i).parmNo) : m(i).val : msg);
+        setErr(err : 'IMQ0014' : 'ARGS entry ' + %char(i) + ': ' + msg);
+        return *off;
+      endif;
+    endif;
+  endfor;
+  return *on;
+end-proc;
+
+dcl-proc describeMatchers;
+  dcl-pi *n varchar(1024);
+    m likeds(matcher_t) dim(64) const;
+    nM int(10) const;
+  end-pi;
+  dcl-s t varchar(1024);
+  dcl-s i int(10);
+  if nM = 0;
+    return 'any arguments';
+  endif;
+  for i = 1 to nM;
+    if i > 1;
+      t += ', ';
+    endif;
+    t += %char(m(i).parmNo) + ' ' + %trim(m(i).matcher);
+    if m(i).matcher <> '*ANY' and m(i).matcher <> '*OMIT'
+       and m(i).matcher <> '*NOTPASSED' and m(i).matcher <> '*BLANK';
+      t += ' ''' + %trimr(m(i).val) + '''';
+    endif;
+  endfor;
+  return '(' + t + ')';
+end-proc;
+
+// ==================================================================
+// Recorded calls
+// ==================================================================
+dcl-proc loadCallArgs;
+  dcl-pi *n;
+    callId int(10) const;
+    st char(1) dim(64);
+    vals varchar(1024) dim(64);
+    nArgs int(10);
+  end-pi;
+  dcl-s parmNo int(5);
+  dcl-s state char(1);
+  dcl-s v varchar(1024);
+
+  st = 'N';
+  vals = '';
+  nArgs = 0;
+  exec sql declare cCarg cursor for
+    select parmno, state, val from qtemp.imoq_carg
+     where callid = :callId order by parmno;
+  exec sql open cCarg;
+  dow sqlcode = 0;
+    exec sql fetch next from cCarg into :parmNo, :state, :v;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    if parmNo >= 1 and parmNo <= IMOQ_MAXP;
+      st(parmNo) = state;
+      vals(parmNo) = v;
+      if parmNo > nArgs;
+        nArgs = parmNo;
+      endif;
+    endif;
+  enddo;
+  exec sql close cCarg;
+end-proc;
+
+dcl-proc describeCall;
+  dcl-pi *n varchar(512);
+    callId int(10) const;
+  end-pi;
+  dcl-s st char(1) dim(64);
+  dcl-s vals varchar(1024) dim(64);
+  dcl-s nArgs int(10);
+  dcl-s t varchar(512);
+  dcl-s v varchar(1024);
+  dcl-s i int(10);
+
+  loadCallArgs(callId : st : vals : nArgs);
+  for i = 1 to nArgs;
+    if st(i) = 'N';
+      leave;
+    endif;
+    if i > 1;
+      t += ', ';
+    endif;
+    if st(i) = 'O';
+      v = '*OMIT';
+    else;
+      v = %trimr(vals(i));
+      if %len(v) > 30;
+        v = %subst(v : 1 : 27) + '...';
+      endif;
+      v = '''' + v + '''';
+    endif;
+    if %len(t) + %len(v) > 400;
+      t += '...';
+      leave;
+    endif;
+    t += v;
+  endfor;
+  return '#' + %char(callId) + '(' + t + ')';
+end-proc;
+
+dcl-proc callMatches;
+  dcl-pi *n ind;
+    callId int(10) const;
+    m likeds(matcher_t) dim(64) const;
+    nM int(10) const;
+    defs likeds(imoq_def_t) dim(64) const;
+    nDefs int(10) const;
+  end-pi;
+  dcl-s st char(1) dim(64);
+  dcl-s vals varchar(1024) dim(64);
+  dcl-s nArgs int(10);
+  dcl-s i int(10);
+  dcl-ds d likeds(imoq_def_t);
+
+  if nM = 0;
+    return *on;
+  endif;
+  loadCallArgs(callId : st : vals : nArgs);
+  for i = 1 to nM;
+    clear d;
+    d.type = '*CHAR';
+    if m(i).parmNo <= nDefs;
+      d = defs(m(i).parmNo);
+    endif;
+    if not imoq_match(m(i).matcher : m(i).val : st(m(i).parmNo)
+                      : vals(m(i).parmNo) : d);
+      return *off;
+    endif;
+  endfor;
+  return *on;
+end-proc;
+
+dcl-proc loadCallIds;
+  dcl-pi *n int(10);
+    obj char(10) const;
+    proc varchar(4096) const;
+    ids int(10) dim(5000);
+  end-pi;
+  dcl-s n int(10);
+  dcl-s id int(10);
+  exec sql declare cCall cursor for
+    select callid from qtemp.imoq_call
+     where obj = :obj and proc = :proc order by callid;
+  exec sql open cCall;
+  dow sqlcode = 0 and n < MAXCALLS;
+    exec sql fetch next from cCall into :id;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    n += 1;
+    ids(n) = id;
+  enddo;
+  exec sql close cCall;
+  return n;
+end-proc;
+
+// ==================================================================
+// CL command entry points (called by the command processing pgms)
+// ==================================================================
+
+// IMOQPGM -----------------------------------------------------------
+dcl-proc imoq_cl_defPgm export;
+  dcl-pi *n;
+    obj char(10) const;
+    behavior char(7) const;
+    parms char(1) options(*varsize);
+    realLib char(10) const;
+    mockLib char(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-s p pointer;
+  dcl-s n int(10);
+  dcl-s i int(10);
+  dcl-s msg varchar(512);
+  dcl-s m256 varchar(256);
+
+  clearErr(err);
+  ensureTables();
+  p = %addr(parms);
+  n = lstCount(p);
+  if n > IMOQ_MAXP;
+    setErr(err : 'IMQ0014' : 'At most 64 parameters can be declared');
+    return;
+  endif;
+  for i = 1 to n;
+    readDef(lstEntry(p : i) : defs(i) : *off);
+    if not imoq_normDef(defs(i) : m256);
+      setErr(err : 'IMQ0014' : 'PARMS entry ' + %char(i) + ': ' + m256);
+      return;
+    endif;
+  endfor;
+
+  forgetObj(obj);
+  exec sql insert into qtemp.imoq_obj
+    values(:obj, '*PGM', :behavior, :realLib, 'N', 'PGM', '', :mockLib);
+  if sqlcode < 0;
+    setErr(err : 'IMQ0015' : sqlFailText('Register mock'));
+    return;
+  endif;
+  exec sql insert into qtemp.imoq_proc
+    values(:obj, '*PGM', 1, 'PROC', 0, 'Y');
+  for i = 1 to n;
+    insertSig(obj : '*PGM' : i : defs(i));
+  endfor;
+
+  if not imoq_genPgm(obj : n : msg);
+    setErr(err : 'IMQ0015' : msg);
+    return;
+  endif;
+  err.text = %char(n) + ' parameter(s) declared';
+end-proc;
+
+// IMOQSRVPGM --------------------------------------------------------
+dcl-proc imoq_cl_defSrv export;
+  dcl-pi *n;
+    obj char(10) const;
+    behavior char(7) const;
+    realLib char(10) const;
+    mockLib char(10) const;
+    srcFile char(10) const;
+    signature char(16) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s names varchar(4096) dim(2000);
+  dcl-s n int(10);
+  dcl-s i int(10);
+  dcl-s msg varchar(512);
+  dcl-s nm varchar(4096);
+  dcl-s kind char(4);
+  dcl-s size int(10);
+  dcl-s nData int(10);
+  dcl-s sig varchar(16);
+
+  clearErr(err);
+  ensureTables();
+
+  // SRCFILE(*NONE): the exports are the procedures declared with IMOQPROC
+  if srcFile = '*NONE';
+    sig = %trim(signature);
+    if %scan('''' : sig) > 0 or %scan('"' : sig) > 0;
+      setErr(err : 'IMQ0014' : 'SIGNATURE cannot contain quotes');
+      return;
+    endif;
+    forgetObj(obj);
+    exec sql insert into qtemp.imoq_obj
+      values(:obj, '*SRVPGM', :behavior, :realLib, 'N', 'PROC', :sig,
+             :mockLib);
+    if sqlcode < 0;
+      setErr(err : 'IMQ0015' : sqlFailText('Register mock'));
+      return;
+    endif;
+    err.text = 'no exports yet; every procedure declared with IMOQPROC '
+             + 'becomes an export';
+    return;
+  endif;
+
+  if not imoq_readExports(obj : names : n : msg);
+    setErr(err : 'IMQ0013' : msg);
+    return;
+  endif;
+  if n = 0;
+    setErr(err : 'IMQ0013' : 'No exports found in the binder source for '
+         + %trim(obj));
+    return;
+  endif;
+
+  forgetObj(obj);
+  exec sql insert into qtemp.imoq_obj
+    values(:obj, '*SRVPGM', :behavior, :realLib, 'N', 'SRC', '', :mockLib);
+  if sqlcode < 0;
+    setErr(err : 'IMQ0015' : sqlFailText('Register mock'));
+    return;
+  endif;
+
+  for i = 1 to n;
+    nm = names(i);
+    kind = 'PROC';
+    size = 0;
+    if realLib <> '*NONE';
+      exec sql select data_item_size into :size
+                 from qsys2.program_export_import_info
+                where program_library = :realLib
+                  and program_name = :obj
+                  and object_type = '*SRVPGM'
+                  and symbol_usage = '*DATAEXP'
+                  and cast(symbol_name as varchar(4096)) = :nm
+                fetch first 1 row only;
+      if sqlcode = 0;
+        kind = 'DATA';
+        nData += 1;
+        if size < 1;
+          size = 1;
+        endif;
+      else;
+        size = 0;
+      endif;
+    endif;
+    exec sql insert into qtemp.imoq_proc
+      values(:obj, :nm, :i, :kind, :size, 'N');
+  endfor;
+  err.text = %char(n) + ' export(s) found (' + %char(nData) + ' data)';
+end-proc;
+
+// IMOQPROC ----------------------------------------------------------
+dcl-proc imoq_cl_defProc export;
+  dcl-pi *n;
+    obj char(10) const;
+    procVary char(258);
+    rtn char(1) options(*varsize);
+    parms char(1) options(*varsize);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s proc varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-ds rtnDef likeds(imoq_def_t);
+  dcl-s hasRtn ind;
+  dcl-s p pointer;
+  dcl-s n int(10);
+  dcl-s i int(10);
+  dcl-s m256 varchar(256);
+
+  clearErr(err);
+  ensureTables();
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist. '
+         + 'Create it with IMOQSRVPGM first');
+    return;
+  endif;
+  if objType <> '*SRVPGM';
+    setErr(err : 'IMQ0012' : 'IMOQPROC applies to service program mocks; '
+         + %trim(obj) + ' is a program mock (use IMOQPGM PARMS)');
+    return;
+  endif;
+  if not addExport(obj : varyText(%addr(procVary) : 256) : err);
+    return;
+  endif;
+  if not resolveProc(obj : objType : varyText(%addr(procVary) : 256)
+                     : proc : kind : declared : err);
+    return;
+  endif;
+  if kind = 'DATA';
+    setErr(err : 'IMQ0012' : proc + ' is a data export, not a procedure');
+    return;
+  endif;
+
+  p = %addr(rtn);
+  hasRtn = *off;
+  if lstCount(p) > 0;
+    readDef(p : rtnDef : *off);
+    rtnDef.type = %xlate(LOWER : UPPER : rtnDef.type);
+    if rtnDef.type <> '*NONE' and rtnDef.type <> ' ';
+      if not imoq_normDef(rtnDef : m256);
+        setErr(err : 'IMQ0014' : 'RTNTYPE: ' + m256);
+        return;
+      endif;
+      hasRtn = *on;
+    endif;
+  endif;
+
+  p = %addr(parms);
+  n = lstCount(p);
+  if n > IMOQ_MAXP;
+    setErr(err : 'IMQ0014' : 'At most 64 parameters can be declared');
+    return;
+  endif;
+  for i = 1 to n;
+    readDef(lstEntry(p : i) : defs(i) : *on);
+    if not imoq_normDef(defs(i) : m256);
+      setErr(err : 'IMQ0014' : 'PARMS entry ' + %char(i) + ': ' + m256);
+      return;
+    endif;
+  endfor;
+
+  exec sql delete from qtemp.imoq_sig where obj = :obj and proc = :proc;
+  if hasRtn;
+    insertSig(obj : proc : 0 : rtnDef);
+  endif;
+  for i = 1 to n;
+    insertSig(obj : proc : i : defs(i));
+  endfor;
+  exec sql update qtemp.imoq_proc set declared = 'Y'
+            where obj = :obj and proc = :proc;
+  exec sql update qtemp.imoq_obj set built = 'N' where obj = :obj;
+  err.text = proc;
+end-proc;
+
+// IMOQBUILD ---------------------------------------------------------
+dcl-proc imoq_cl_genSrv export;
+  dcl-pi *n;
+    obj char(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s msg varchar(512);
+
+  clearErr(err);
+  ensureTables();
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist. '
+         + 'Create it with IMOQSRVPGM first');
+    return;
+  endif;
+  if objType <> '*SRVPGM';
+    setErr(err : 'IMQ0012' : 'IMOQBUILD applies to service program mocks; '
+         + %trim(obj) + ' is a program mock');
+    return;
+  endif;
+  if not imoq_genSrv(obj : msg);
+    setErr(err : 'IMQ0015' : msg);
+  endif;
+end-proc;
+
+dcl-proc imoq_cl_setBuilt export;
+  dcl-pi *n;
+    obj char(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  clearErr(err);
+  ensureTables();
+  exec sql update qtemp.imoq_obj set built = 'Y' where obj = :obj;
+end-proc;
+
+// Record a failure detected by a command processing program
+dcl-proc imoq_cl_fail export;
+  dcl-pi *n;
+    msgId char(7) const;
+    text char(512) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  setErr(err : msgId : %trimr(text));
+end-proc;
+
+// IMOQWHEN ----------------------------------------------------------
+dcl-proc imoq_cl_when export;
+  dcl-pi *n;
+    obj char(10) const;
+    procVary char(258);
+    args char(1) options(*varsize);
+    rtns char(1) options(*varsize);
+    sets char(1) options(*varsize);
+    thr char(1) options(*varsize);
+    times int(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s proc varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-ds rtnDef likeds(imoq_def_t);
+  dcl-s hasRtn ind;
+  dcl-s nDefs int(10);
+  dcl-ds m likeds(matcher_t) dim(64);
+  dcl-s nM int(10);
+  dcl-s rtnVal varchar(1024) dim(32);
+  dcl-s nRtn int(10);
+  dcl-s setNo int(10) dim(64);
+  dcl-s setVal varchar(1024) dim(64);
+  dcl-s nSet int(10);
+  dcl-s thrId char(7);
+  dcl-s thrMsgf char(10);
+  dcl-s thrLib char(10);
+  dcl-s thrDta varchar(512);
+  dcl-s p pointer;
+  dcl-s e pointer;
+  dcl-s i int(10);
+  dcl-s id int(10);
+  dcl-s seq int(10);
+  dcl-s parmNo int(5);
+  dcl-s v varchar(1024);
+  dcl-s mt char(10);
+  dcl-s lbl varchar(4200);
+  dcl-s m256 varchar(256);
+
+  clearErr(err);
+  ensureTables();
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist. '
+         + 'Create it with IMOQPGM or IMOQSRVPGM first');
+    return;
+  endif;
+  if not resolveProc(obj : objType : varyText(%addr(procVary) : 256)
+                     : proc : kind : declared : err);
+    return;
+  endif;
+  lbl = label(obj : proc);
+  if kind = 'DATA';
+    setErr(err : 'IMQ0012' : proc + ' is a data export and cannot be '
+         + 'stubbed');
+    return;
+  endif;
+  loadSig(obj : proc : defs : nDefs : rtnDef : hasRtn);
+
+  if not readMatchers(%addr(args) : m : nM : defs : nDefs : lbl : err);
+    return;
+  endif;
+
+  // RETURN values
+  p = %addr(rtns);
+  nRtn = lstCount(p);
+  if nRtn > 32;
+    setErr(err : 'IMQ0014' : 'At most 32 RETURN values are allowed');
+    return;
+  endif;
+  for i = 1 to nRtn;
+    rtnVal(i) = varyText(p + 2 + (i - 1) * 258 : 256);
+  endfor;
+  if nRtn > 0 and not hasRtn;
+    setErr(err : 'IMQ0014' : lbl + ' has no declared return value. '
+         + 'Declare RTNTYPE with IMOQPROC');
+    return;
+  endif;
+  for i = 1 to nRtn;
+    if not canEncode(rtnDef : rtnVal(i) : m256);
+      setErr(err : 'IMQ0014' : 'RETURN value ' + %char(i) + ': ' + m256);
+      return;
+    endif;
+  endfor;
+
+  // SETPARM values
+  p = %addr(sets);
+  nSet = lstCount(p);
+  if nSet > IMOQ_MAXP;
+    setErr(err : 'IMQ0014' : 'At most 64 SETPARM entries are allowed');
+    return;
+  endif;
+  for i = 1 to nSet;
+    e = lstEntry(p : i);
+    setNo(i) = int2At(e + 2);
+    setVal(i) = varyText(e + 4 : 256);
+    if setNo(i) < 1 or setNo(i) > nDefs;
+      setErr(err : 'IMQ0014' : 'SETPARM entry ' + %char(i) + ': parameter '
+           + %char(setNo(i)) + ' of ' + lbl + ' is not declared');
+      return;
+    endif;
+    if defs(setNo(i)).passing = '*VALUE';
+      setErr(err : 'IMQ0014' : 'SETPARM entry ' + %char(i) + ': parameter '
+           + %char(setNo(i)) + ' is passed by value and cannot be set');
+      return;
+    endif;
+    if not canEncode(defs(setNo(i)) : setVal(i) : m256);
+      setErr(err : 'IMQ0014' : 'SETPARM entry ' + %char(i) + ': ' + m256);
+      return;
+    endif;
+  endfor;
+
+  // THROW
+  p = %addr(thr);
+  thrId = ' ';
+  thrMsgf = ' ';
+  thrLib = ' ';
+  thrDta = '';
+  if lstCount(p) > 0;
+    thrId = %xlate(LOWER : UPPER : charAt(p + 2 : 7));
+    if thrId = '*NONE' or thrId = ' ';
+      thrId = ' ';
+    else;
+      thrMsgf = %xlate(LOWER : UPPER : charAt(p + 9 : 10));
+      thrLib = %xlate(LOWER : UPPER : charAt(p + 19 : 10));
+      thrDta = varyText(p + 29 : 256);
+      if thrId = '*MOCK';
+        thrId = 'IMQ0101';
+      endif;
+      if thrMsgf = '*MOCK' or thrMsgf = ' ';
+        thrMsgf = 'IMOQMSGF';
+        thrLib = psds.lib;
+      endif;
+      if thrLib = ' ';
+        thrLib = '*LIBL';
+      endif;
+    endif;
+  endif;
+
+  if times < -1;
+    setErr(err : 'IMQ0014' : 'TIMES must be *ALWAYS or a positive number');
+    return;
+  endif;
+
+  exec sql select coalesce(max(stubid), 0) + 1 into :id
+             from qtemp.imoq_stub;
+  exec sql insert into qtemp.imoq_stub
+    values(:id, :obj, :proc, :times, 0, :thrId, :thrMsgf, :thrLib,
+           :thrDta, :nRtn);
+  if sqlcode < 0;
+    setErr(err : 'IMQ0015' : sqlFailText('Save stub'));
+    return;
+  endif;
+  for i = 1 to nM;
+    parmNo = m(i).parmNo;
+    mt = m(i).matcher;
+    v = m(i).val;
+    exec sql insert into qtemp.imoq_sarg values(:id, :parmNo, :mt, :v);
+  endfor;
+  for i = 1 to nRtn;
+    seq = i;
+    v = rtnVal(i);
+    exec sql insert into qtemp.imoq_srtn values(:id, :seq, :v);
+  endfor;
+  for i = 1 to nSet;
+    parmNo = setNo(i);
+    v = setVal(i);
+    exec sql insert into qtemp.imoq_sset values(:id, :parmNo, :v);
+  endfor;
+end-proc;
+
+// IMOQVERIFY --------------------------------------------------------
+dcl-proc imoq_cl_verify export;
+  dcl-pi *n;
+    obj char(10) const;
+    procVary char(258);
+    args char(1) options(*varsize);
+    timesBlob char(1) options(*varsize);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s proc varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-ds rtnDef likeds(imoq_def_t);
+  dcl-s hasRtn ind;
+  dcl-s nDefs int(10);
+  dcl-ds m likeds(matcher_t) dim(64);
+  dcl-s nM int(10);
+  dcl-s ids int(10) dim(5000);
+  dcl-s hit ind dim(5000);
+  dcl-s nIds int(10);
+  dcl-s mode char(9);
+  dcl-s want int(10);
+  dcl-s cnt int(10);
+  dcl-s ok ind;
+  dcl-s i int(10);
+  dcl-s id int(10);
+  dcl-s p pointer;
+  dcl-s lbl varchar(4200);
+  dcl-s modeText varchar(40);
+  dcl-s txt varchar(2000);
+
+  clearErr(err);
+  ensureTables();
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist');
+    return;
+  endif;
+  if not resolveProc(obj : objType : varyText(%addr(procVary) : 256)
+                     : proc : kind : declared : err);
+    return;
+  endif;
+  lbl = label(obj : proc);
+  loadSig(obj : proc : defs : nDefs : rtnDef : hasRtn);
+  if not readMatchers(%addr(args) : m : nM : defs : nDefs : lbl : err);
+    return;
+  endif;
+
+  p = %addr(timesBlob);
+  mode = '*EXACTLY';
+  want = 1;
+  if lstCount(p) > 0;
+    mode = %xlate(LOWER : UPPER : charAt(p + 2 : 9));
+    want = int4At(p + 11);
+  endif;
+  if mode = '*ONCE';
+    mode = '*EXACTLY';
+    want = 1;
+  elseif mode = '*NEVER';
+    mode = '*EXACTLY';
+    want = 0;
+  endif;
+  if want < 0;
+    setErr(err : 'IMQ0014' : 'TIMES count cannot be negative');
+    return;
+  endif;
+
+  nIds = loadCallIds(obj : proc : ids);
+  for i = 1 to nIds;
+    hit(i) = callMatches(ids(i) : m : nM : defs : nDefs);
+    if hit(i);
+      cnt += 1;
+    endif;
+  endfor;
+
+  select;
+  when mode = '*ATLEAST';
+    ok = cnt >= want;
+    modeText = 'at least ' + %char(want) + ' time(s)';
+  when mode = '*ATMOST';
+    ok = cnt <= want;
+    modeText = 'at most ' + %char(want) + ' time(s)';
+  other;
+    ok = cnt = want;
+    modeText = 'exactly ' + %char(want) + ' time(s)';
+  endsl;
+
+  if ok;
+    for i = 1 to nIds;
+      if hit(i);
+        id = ids(i);
+        exec sql update qtemp.imoq_call set verified = 'Y'
+                  where callid = :id;
+      endif;
+    endfor;
+    return;
+  endif;
+
+  txt = 'Verification failed: expected ' + lbl + ' to be called '
+      + modeText + ' with ' + describeMatchers(m : nM)
+      + ' but it matched ' + %char(cnt) + ' time(s). Recorded calls: ';
+  if nIds = 0;
+    txt += 'none';
+  endif;
+  for i = 1 to nIds;
+    if i > 5;
+      txt += ' ... (' + %char(nIds) + ' total)';
+      leave;
+    endif;
+    if i > 1;
+      txt += ' ';
+    endif;
+    txt += describeCall(ids(i));
+  endfor;
+  if %len(txt) > 512;
+    txt = %subst(txt : 1 : 509) + '...';
+  endif;
+  setErr(err : 'IMQ0200' : txt);
+end-proc;
+
+// IMOQNOMORE --------------------------------------------------------
+dcl-proc imoq_cl_noMore export;
+  dcl-pi *n;
+    obj char(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s id int(10);
+  dcl-s o char(10);
+  dcl-s proc varchar(4096);
+  dcl-s n int(10);
+  dcl-s txt varchar(2000);
+
+  clearErr(err);
+  ensureTables();
+  exec sql declare cUnv cursor for
+    select callid, obj, proc from qtemp.imoq_call
+     where verified <> 'Y' and (obj = :obj or :obj = '*ALL')
+     order by callid;
+  exec sql open cUnv;
+  dow sqlcode = 0;
+    exec sql fetch next from cUnv into :id, :o, :proc;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    n += 1;
+    if n <= 5;
+      txt += ' ' + label(o : proc) + describeCall(id);
+    endif;
+  enddo;
+  exec sql close cUnv;
+
+  if n > 0;
+    txt = 'Unverified interactions (' + %char(n) + '):' + txt;
+    if %len(txt) > 512;
+      txt = %subst(txt : 1 : 509) + '...';
+    endif;
+    setErr(err : 'IMQ0201' : txt);
+  endif;
+end-proc;
+
+// IMOQGETARG --------------------------------------------------------
+dcl-proc getArg;
+  dcl-pi *n ind;
+    obj char(10) const;
+    procIn varchar(4096) const;
+    callNo int(10) const;
+    parmNo int(10) const;
+    val varchar(1024);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s proc varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  dcl-s id int(10);
+  dcl-s offs int(10);
+  dcl-s state char(1);
+  dcl-s p5 int(5);
+
+  val = '';
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist');
+    return *off;
+  endif;
+  if not resolveProc(obj : objType : procIn : proc : kind : declared
+                     : err);
+    return *off;
+  endif;
+
+  id = 0;
+  if callNo = -1;
+    exec sql select coalesce(max(callid), 0) into :id
+               from qtemp.imoq_call where obj = :obj and proc = :proc;
+  else;
+    offs = callNo - 1;
+    if offs < 0;
+      offs = 0;
+    endif;
+    exec sql select callid into :id from qtemp.imoq_call
+              where obj = :obj and proc = :proc order by callid
+              offset :offs rows fetch first 1 row only;
+    if sqlcode <> 0;
+      id = 0;
+    endif;
+  endif;
+  if id = 0;
+    setErr(err : 'IMQ0202' : label(obj : proc) + ' has no call number '
+         + %char(callNo) + ' (it was called '
+         + %char(countCalls(obj : proc)) + ' time(s))');
+    return *off;
+  endif;
+
+  p5 = parmNo;
+  exec sql select state, val into :state, :val from qtemp.imoq_carg
+            where callid = :id and parmno = :p5;
+  if sqlcode <> 0 or state = 'N';
+    val = '*NOTPASSED';
+  elseif state = 'O';
+    val = '*OMIT';
+  endif;
+  return *on;
+end-proc;
+
+dcl-proc countCalls;
+  dcl-pi *n int(10);
+    obj char(10) const;
+    proc varchar(4096) const;
+  end-pi;
+  dcl-s n int(10);
+  exec sql select count(*) into :n from qtemp.imoq_call
+            where obj = :obj and proc = :proc;
+  return n;
+end-proc;
+
+dcl-proc imoq_cl_getArg export;
+  dcl-pi *n;
+    obj char(10) const;
+    procVary char(258);
+    callNo int(10) const;
+    parmNo int(5) const;
+    rtn char(256);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s v varchar(1024);
+  clearErr(err);
+  ensureTables();
+  rtn = ' ';
+  if getArg(obj : varyText(%addr(procVary) : 256) : callNo : parmNo
+            : v : err);
+    rtn = v;
+  endif;
+end-proc;
+
+// IMOQCOUNT ---------------------------------------------------------
+dcl-proc imoq_cl_count export;
+  dcl-pi *n;
+    obj char(10) const;
+    procVary char(258);
+    args char(1) options(*varsize);
+    count packed(10:0);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s proc varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-ds rtnDef likeds(imoq_def_t);
+  dcl-s hasRtn ind;
+  dcl-s nDefs int(10);
+  dcl-ds m likeds(matcher_t) dim(64);
+  dcl-s nM int(10);
+  dcl-s ids int(10) dim(5000);
+  dcl-s nIds int(10);
+  dcl-s i int(10);
+
+  clearErr(err);
+  ensureTables();
+  count = 0;
+  if not objInfo(obj : objType : behavior : built : realLib);
+    setErr(err : 'IMQ0011' : 'Mock ' + %trim(obj) + ' does not exist');
+    return;
+  endif;
+  if not resolveProc(obj : objType : varyText(%addr(procVary) : 256)
+                     : proc : kind : declared : err);
+    return;
+  endif;
+  loadSig(obj : proc : defs : nDefs : rtnDef : hasRtn);
+  if not readMatchers(%addr(args) : m : nM : defs : nDefs
+                      : label(obj : proc) : err);
+    return;
+  endif;
+  nIds = loadCallIds(obj : proc : ids);
+  for i = 1 to nIds;
+    if callMatches(ids(i) : m : nM : defs : nDefs);
+      count += 1;
+    endif;
+  endfor;
+end-proc;
+
+// IMOQRESET ---------------------------------------------------------
+dcl-proc imoq_cl_reset export;
+  dcl-pi *n;
+    obj char(10) const;
+    scope char(7) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  clearErr(err);
+  ensureTables();
+  if scope = '*CALLS' or scope = '*ALL';
+    deleteCalls(obj);
+  endif;
+  if scope = '*STUBS' or scope = '*ALL';
+    deleteStubs(obj);
+  endif;
+end-proc;
+
+// IMOQRMV -----------------------------------------------------------
+dcl-proc imoq_cl_list export;
+  dcl-pi *n;
+    obj char(10) const;
+    list char(5400);
+    count int(10);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s o char(10);
+  dcl-s t char(7);
+  dcl-s l char(10);
+
+  clearErr(err);
+  ensureTables();
+  list = ' ';
+  count = 0;
+  exec sql declare cObj cursor for
+    select obj, objtype, mocklib from qtemp.imoq_obj
+     where obj = :obj or :obj = '*ALL' order by obj;
+  exec sql open cObj;
+  dow sqlcode = 0 and count < 200;
+    exec sql fetch next from cObj into :o, :t, :l;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    %subst(list : count * 27 + 1 : 27) = o + t + l;
+    count += 1;
+  enddo;
+  exec sql close cObj;
+end-proc;
+
+// Library a mock object was created in
+dcl-proc imoq_cl_mockLib export;
+  dcl-pi *n;
+    obj char(10) const;
+    lib char(10);
+    err likeds(imoq_err_t);
+  end-pi;
+  clearErr(err);
+  ensureTables();
+  lib = 'QTEMP';
+  exec sql select mocklib into :lib from qtemp.imoq_obj where obj = :obj;
+end-proc;
+
+dcl-proc imoq_cl_forget export;
+  dcl-pi *n;
+    obj char(10) const;
+    err likeds(imoq_err_t);
+  end-pi;
+  clearErr(err);
+  if obj = '*ALL';
+    dropTables();
+    return;
+  endif;
+  ensureTables();
+  forgetObj(obj);
+end-proc;
+
+// IMOQCHK -----------------------------------------------------------
+dcl-proc findObj;
+  dcl-pi *n char(10);
+    lib char(10) const;
+    obj char(10) const;
+    type char(10) const;
+  end-pi;
+  dcl-s rcv char(90);
+  dcl-ds ec likeds(apiErr_t);
+  ec.bytesProv = %size(ec);
+  ec.bytesAvail = 0;
+  qusrobjd(rcv : %size(rcv) : 'OBJD0100' : obj + lib : type : ec);
+  if ec.bytesAvail > 0;
+    return ' ';
+  endif;
+  return %subst(rcv : 39 : 10);
+end-proc;
+
+dcl-proc imoq_cl_check export;
+  dcl-pi *n;
+    pgmQ char(20) const;
+    outLines char(5000);
+    count int(10);
+    err likeds(imoq_err_t);
+  end-pi;
+  dcl-s o char(10);
+  dcl-s t char(7);
+  dcl-s built char(1);
+  dcl-s hit char(10);
+  dcl-s pgm char(10);
+  dcl-s pgmLib char(10);
+  dcl-s pgmType char(10);
+  dcl-s bLib char(10);
+  dcl-s bSrv char(10);
+  dcl-s mlib char(10);
+
+  clearErr(err);
+  ensureTables();
+  outLines = ' ';
+  count = 0;
+
+  exec sql declare cChk cursor for
+    select obj, objtype, built, mocklib from qtemp.imoq_obj order by obj;
+  exec sql open cChk;
+  dow sqlcode = 0;
+    exec sql fetch next from cChk into :o, :t, :built, :mlib;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    hit = findObj('*LIBL' : o : t);
+    if hit = ' ';
+      addLine(outLines : count : 'Mock ' + %trim(o) + ' ' + %trim(t)
+            + ' was not found in the library list (run IMOQBUILD or '
+            + 're-create the mock)');
+    elseif hit <> mlib;
+      addLine(outLines : count : 'Mock ' + %trim(mlib) + '/' + %trim(o)
+            + ' is hidden by ' + %trim(hit) + '/' + %trim(o)
+            + ', which comes first in the library list');
+    endif;
+    if t = '*SRVPGM' and built <> 'Y';
+      addLine(outLines : count : 'Service program mock ' + %trim(o)
+            + ' has changes that are not built (run IMOQBUILD)');
+    endif;
+  enddo;
+  exec sql close cChk;
+
+  pgm = %subst(pgmQ : 1 : 10);
+  pgmLib = %subst(pgmQ : 11 : 10);
+  if pgm = '*NONE' or pgm = ' ';
+    return;
+  endif;
+  pgmType = '*PGM';
+  hit = findObj(pgmLib : pgm : pgmType);
+  if hit = ' ';
+    pgmType = '*SRVPGM';
+    hit = findObj(pgmLib : pgm : pgmType);
+  endif;
+  if hit = ' ';
+    addLine(outLines : count : 'Program ' + %trim(pgmLib) + '/' + %trim(pgm)
+          + ' was not found');
+    return;
+  endif;
+  pgmLib = hit;
+
+  exec sql declare cBnd cursor for
+    select b.bound_service_program_library, b.bound_service_program
+      from qsys2.bound_srvpgm_info b
+      join qtemp.imoq_obj m on m.obj = b.bound_service_program
+     where b.program_library = :pgmLib and b.program_name = :pgm
+       and b.bound_service_program_library <> '*LIBL';
+  exec sql open cBnd;
+  dow sqlcode = 0;
+    exec sql fetch next from cBnd into :bLib, :bSrv;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    addLine(outLines : count : %trim(pgmLib) + '/' + %trim(pgm) + ' binds '
+          + %trim(bSrv) + ' from library ' + %trim(bLib)
+          + ' instead of *LIBL, so the mock will not be used. Rebind '
+          + 'with BNDSRVPGM((*LIBL/' + %trim(bSrv) + '))');
+  enddo;
+  exec sql close cBnd;
+end-proc;
+
+dcl-proc addLine;
+  dcl-pi *n;
+    outLines char(5000);
+    count int(10);
+    text varchar(512) const;
+  end-pi;
+  if count >= 20;
+    return;
+  endif;
+  %subst(outLines : count * 250 + 1 : 250) = text;
+  count += 1;
+end-proc;
+
+// ==================================================================
+// imoq_invoke - runtime entry used by every generated stub
+//   returns 1 when the stub must send thr as an escape message
+// ==================================================================
+dcl-proc imoq_invoke export;
+  dcl-pi *n int(10);
+    obj char(10) const;
+    proc varchar(4096) const;
+    parmCount int(10) value;
+    parmPtrs pointer value;
+    rtnPtr pointer value;
+    thr likeds(imoq_throw_t);
+  end-pi;
+
+  dcl-s ptrs pointer dim(64) based(parmPtrs);
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-ds defs likeds(imoq_def_t) dim(64);
+  dcl-ds rtnDef likeds(imoq_def_t);
+  dcl-s hasRtn ind;
+  dcl-s nDefs int(10);
+  dcl-s st char(1) dim(64);
+  dcl-s vals varchar(1024) dim(64);
+  dcl-s nPassed int(10);
+  dcl-s nCap int(10);
+  dcl-s i int(10);
+  dcl-s callId int(10);
+  dcl-s parmNo int(5);
+  dcl-s state char(1);
+  dcl-s v varchar(1024);
+  dcl-s stubIds int(10) dim(500);
+  dcl-s stubLeft int(10) dim(500);
+  dcl-s stubUsed int(10) dim(500);
+  dcl-s nStubs int(10);
+  dcl-s sid int(10);
+  dcl-s sleft int(10);
+  dcl-s sused int(10);
+  dcl-s chosen int(10);
+  dcl-s thrId char(7);
+  dcl-s thrMsgf char(10);
+  dcl-s thrLib char(10);
+  dcl-s thrDta varchar(512);
+  dcl-s rtnCnt int(10);
+  dcl-s seq int(10);
+  dcl-s m256 varchar(256);
+  dcl-s args varchar(512);
+
+  clear thr;
+  monitor;
+    ensureTables();
+    if not objInfo(obj : objType : behavior : built : realLib);
+      return 0;
+    endif;
+    loadSig(obj : proc : defs : nDefs : rtnDef : hasRtn);
+
+    nPassed = parmCount;
+    if nPassed < 0;
+      nPassed = nDefs;
+    endif;
+    if nPassed > IMOQ_MAXP;
+      nPassed = IMOQ_MAXP;
+    endif;
+    nCap = nPassed;
+    if nDefs > nCap;
+      nCap = nDefs;
+    endif;
+
+    // capture arguments as they arrived
+    for i = 1 to nCap;
+      if i > nPassed;
+        st(i) = 'N';
+        vals(i) = '';
+      elseif parmPtrs = *null or ptrs(i) = *null;
+        st(i) = 'O';
+        vals(i) = '';
+      elseif i <= nDefs;
+        st(i) = 'P';
+        vals(i) = imoq_decode(ptrs(i) : defs(i));
+      else;
+        st(i) = 'P';
+        vals(i) = '*UNDECLARED';
+      endif;
+    endfor;
+
+    exec sql select coalesce(max(callid), 0) + 1 into :callId
+               from qtemp.imoq_call;
+    exec sql insert into qtemp.imoq_call
+      values(:callId, :obj, :proc, :nPassed, 0, 'N', current timestamp);
+    for i = 1 to nCap;
+      parmNo = i;
+      state = st(i);
+      v = vals(i);
+      exec sql insert into qtemp.imoq_carg
+        values(:callId, :parmNo, :state, :v);
+    endfor;
+
+    // newest matching stub with uses left wins
+    exec sql declare cStub cursor for
+      select stubid, timesleft, used from qtemp.imoq_stub
+       where obj = :obj and proc = :proc order by stubid desc;
+    exec sql open cStub;
+    dow sqlcode = 0 and nStubs < MAXSTUBS;
+      exec sql fetch next from cStub into :sid, :sleft, :sused;
+      if sqlcode <> 0;
+        leave;
+      endif;
+      nStubs += 1;
+      stubIds(nStubs) = sid;
+      stubLeft(nStubs) = sleft;
+      stubUsed(nStubs) = sused;
+    enddo;
+    exec sql close cStub;
+
+    for i = 1 to nStubs;
+      if stubLeft(i) = 0;
+        iter;
+      endif;
+      if stubMatches(stubIds(i) : defs : nDefs : st : vals);
+        chosen = i;
+        leave;
+      endif;
+    endfor;
+
+    if chosen = 0;
+      if behavior = '*STRICT';
+        callMatchesText(callId : args);
+        thr.msgId = 'IMQ0100';
+        thr.msgf = 'IMOQMSGF';
+        thr.msgfLib = psds.lib;
+        thr.msgDta = 'Unexpected call to ' + label(obj : proc) + args
+                   + ' (strict mock has no matching IMOQWHEN)';
+        gLastErr = thr.msgDta;
+        return 1;
+      endif;
+      return 0;
+    endif;
+
+    sid = stubIds(chosen);
+    exec sql update qtemp.imoq_stub
+                set used = used + 1,
+                    timesleft = case when timesleft > 0
+                                     then timesleft - 1
+                                     else timesleft end
+              where stubid = :sid;
+    exec sql update qtemp.imoq_call set stubid = :sid
+              where callid = :callId;
+
+    exec sql select thrid, thrmsgf, thrlib, thrdta, rtncnt
+               into :thrId, :thrMsgf, :thrLib, :thrDta, :rtnCnt
+               from qtemp.imoq_stub where stubid = :sid;
+    if thrId <> ' ';
+      thr.msgId = thrId;
+      thr.msgf = thrMsgf;
+      thr.msgfLib = thrLib;
+      thr.msgDta = thrDta;
+      return 1;
+    endif;
+
+    // SETPARM
+    exec sql declare cSet cursor for
+      select parmno, val from qtemp.imoq_sset
+       where stubid = :sid order by parmno;
+    exec sql open cSet;
+    dow sqlcode = 0;
+      exec sql fetch next from cSet into :parmNo, :v;
+      if sqlcode <> 0;
+        leave;
+      endif;
+      if parmNo >= 1 and parmNo <= nDefs and parmNo <= nPassed;
+        if st(parmNo) = 'P';
+          imoq_encode(ptrs(parmNo) : defs(parmNo) : v : m256);
+        endif;
+      endif;
+    enddo;
+    exec sql close cSet;
+
+    // RETURN (consecutive values, the last one repeats)
+    if rtnCnt > 0 and hasRtn and rtnPtr <> *null;
+      seq = stubUsed(chosen) + 1;
+      if seq > rtnCnt;
+        seq = rtnCnt;
+      endif;
+      exec sql select val into :v from qtemp.imoq_srtn
+                where stubid = :sid and seq = :seq;
+      if sqlcode = 0;
+        imoq_encode(rtnPtr : rtnDef : v : m256);
+      endif;
+    endif;
+  on-error;
+    return 0;
+  endmon;
+  return 0;
+end-proc;
+
+dcl-proc callMatchesText;
+  dcl-pi *n;
+    callId int(10) const;
+    text varchar(512);
+  end-pi;
+  dcl-s d varchar(512);
+  dcl-s p int(10);
+  d = describeCall(callId);
+  p = %scan('(' : d);
+  if p > 0;
+    text = %subst(d : p);
+  else;
+    text = '()';
+  endif;
+end-proc;
+
+dcl-proc stubMatches;
+  dcl-pi *n ind;
+    stubId int(10) const;
+    defs likeds(imoq_def_t) dim(64) const;
+    nDefs int(10) const;
+    st char(1) dim(64) const;
+    vals varchar(1024) dim(64) const;
+  end-pi;
+  dcl-s parmNo int(5);
+  dcl-s matcher char(10);
+  dcl-s v varchar(1024);
+  dcl-s ok ind inz(*on);
+  dcl-ds d likeds(imoq_def_t);
+
+  exec sql declare cSarg cursor for
+    select parmno, matcher, val from qtemp.imoq_sarg
+     where stubid = :stubId order by parmno;
+  exec sql open cSarg;
+  dow sqlcode = 0;
+    exec sql fetch next from cSarg into :parmNo, :matcher, :v;
+    if sqlcode <> 0;
+      leave;
+    endif;
+    clear d;
+    d.type = '*CHAR';
+    if parmNo <= nDefs;
+      d = defs(parmNo);
+    endif;
+    if not imoq_match(matcher : v : st(parmNo) : vals(parmNo) : d);
+      ok = *off;
+      leave;
+    endif;
+  enddo;
+  exec sql close cSarg;
+  return ok;
+end-proc;
+
+// ==================================================================
+// Public API for test programs
+// ==================================================================
+dcl-proc runCmd;
+  dcl-pi *n ind;
+    cmd varchar(3000) const;
+  end-pi;
+  gLastErr = '';
+  monitor;
+    qcmdexc(cmd : %len(cmd));
+  on-error;
+    if gLastErr = '';
+      gLastErr = psds.excType + psds.excNum + ' running: ' + cmd;
+      if %len(gLastErr) > 500;
+        gLastErr = %subst(gLastErr : 1 : 500);
+      endif;
+    endif;
+    return *off;
+  endmon;
+  return *on;
+end-proc;
+
+dcl-proc imoq_run export;
+  dcl-pi *n;
+    cmd varchar(3000) const;
+  end-pi;
+  dcl-s key char(4);
+  dcl-ds ec likeds(apiErr_t);
+  dcl-s dta char(512);
+  if runCmd(cmd);
+    return;
+  endif;
+  ec.bytesProv = 0;
+  dta = gLastErr;
+  qmhsndpm('IMQ0300' : 'IMOQMSGF  ' + psds.lib : dta : %len(gLastErr)
+          : '*ESCAPE' : '*' : 1 : key : ec);
+end-proc;
+
+dcl-proc imoq_ok export;
+  dcl-pi *n ind;
+    cmd varchar(3000) const;
+  end-pi;
+  return runCmd(cmd);
+end-proc;
+
+dcl-proc imoq_lastError export;
+  dcl-pi *n varchar(512) end-pi;
+  return gLastErr;
+end-proc;
+
+dcl-proc imoq_arg export;
+  dcl-pi *n varchar(1024);
+    obj char(10) const;
+    proc varchar(4096) const;
+    callNo int(10) const;
+    parmNo int(10) const;
+  end-pi;
+  dcl-ds err likeds(imoq_err_t);
+  dcl-s v varchar(1024);
+  clearErr(err);
+  ensureTables();
+  if not getArg(obj : proc : callNo : parmNo : v : err);
+    return '*ERROR ' + %trimr(err.text);
+  endif;
+  return v;
+end-proc;
+
+dcl-proc imoq_count export;
+  dcl-pi *n int(10);
+    obj char(10) const;
+    proc varchar(4096) const;
+  end-pi;
+  dcl-ds err likeds(imoq_err_t);
+  dcl-s objType char(7);
+  dcl-s behavior char(7);
+  dcl-s built char(1);
+  dcl-s realLib char(10);
+  dcl-s p varchar(4096);
+  dcl-s kind char(4);
+  dcl-s declared char(1);
+  clearErr(err);
+  ensureTables();
+  if not objInfo(obj : objType : behavior : built : realLib);
+    return -1;
+  endif;
+  if not resolveProc(obj : objType : proc : p : kind : declared : err);
+    return -1;
+  endif;
+  return countCalls(obj : p);
+end-proc;
