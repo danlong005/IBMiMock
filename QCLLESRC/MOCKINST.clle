@@ -16,6 +16,7 @@
              DCL        VAR(&MSGF) TYPE(*CHAR) LEN(20)
              DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
              DCL        VAR(&STEP) TYPE(*CHAR) LEN(40)
+             DCL        VAR(&INLIBL) TYPE(*LGL) VALUE('0')
 
              MONMSG     MSGID(CPF0000 MCH0000 RNS0000 SQL0000) +
                           EXEC(GOTO CMDLBL(FAIL))
@@ -28,8 +29,11 @@
              CHGVAR     VAR(&SRCLIB) VALUE(&PSRCLIB)
              MONMSG     MSGID(MCH3601)
 
-             ADDLIBLE   LIB(&LIB)
-             MONMSG     MSGID(CPF2103)
+/* Make the library available without moving it ahead of QTEMP;    */
+/* take it off the list again at the end if it was added here.      */
+             ADDLIBLE   LIB(&LIB) POSITION(*LAST)
+             MONMSG     MSGID(CPF2103) EXEC(CHGVAR VAR(&INLIBL) +
+                          VALUE('1'))
 
 /* Engine copybook is included from QTEMP so any source file works */
              CHGVAR     VAR(&STEP) VALUE('copybook')
@@ -101,6 +105,10 @@
 
              CHGVAR     VAR(&MSG) VALUE('RPGMOCK installed in' *BCAT +
                           &LIB)
+             IF         COND(*NOT &INLIBL) THEN(DO)
+             RMVLIBLE   LIB(&LIB)
+             MONMSG     MSGID(CPF0000)
+             ENDDO
              SNDPGMMSG  MSGID(CPF9897) MSGF(QCPFMSG) MSGDTA(&MSG) +
                           MSGTYPE(*COMP)
              RETURN

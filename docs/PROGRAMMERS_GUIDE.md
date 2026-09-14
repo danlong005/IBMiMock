@@ -196,7 +196,7 @@ end-proc;
 
 ### Step 5: Run the driver and read the result
 
-Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or `bash bin/run-cl.sh ORDERDRV`. When a verification fails, `assert` reports RPGMOCK's explanation:
+Compile and call the driver in one job, for example `CALL MYLIB/ORDERDRV` from a 5250 session or with `SBMJOB CMD(CALL MYLIB/ORDERDRV)`. When a verification fails, `assert` reports RPGMOCK's explanation:
 
 ```
 Verification failed: expected TAXSRV.CALCTAX to be called exactly 1 time(s)
@@ -466,4 +466,4 @@ select * from qtemp.mock_sig;                          -- declared layouts
 
 ---
 
-RPGMOCK's source lives in the IBMiMock repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Install or refresh a library with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, which also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).
+RPGMOCK's source lives in the IBMiMock repository, in folders named after its source files (`QRPGLESRC`, `QCLLESRC`, `QCMDSRC`, `QSRVSRC`). Build it into a library with `QCLLESRC/BUILD` (see *Install* in the README); `CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')` also runs the unit tests (`MOCKTEST`) and the end-to-end demo (`MOCKDEMO`).

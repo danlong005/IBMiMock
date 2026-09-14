@@ -53,34 +53,62 @@ Each stub call is handled by `MOCK_INVOKE` in `MOCKENG`:
    already activated the real service program keeps it until its activation
    group ends. The same applies in reverse after `MOCKRMV`.
 4. **QTEMP belongs to one job.** Mocks, compiles, and test runs must happen in
-   the same job, so run them from one CL driver. Each `bin/*.sh` SSH call is a
-   new job.
+   the same job, so run them from one CL driver. Each SSH session or submitted
+   job is a new job.
 
 ## Install
 
-```bash
-bash bin/install-rpgmock.sh -l RPGMOCK          # environment from bin/.ibmi-config.json
-bash bin/install-rpgmock.sh -l RPGMOCK -t       # also runs MOCKTEST + MOCKDEMO
-pwsh -ExecutionPolicy Bypass -File bin/install-rpgmock.ps1 -Library RPGMOCK -Tests
-```
-
 RPGMOCK is laid out like an IBM i library. Each folder in this repository is a
-source physical file, and the script copies it into the file of the same name
-in the target library:
+source physical file:
 
 | Folder / source file | Members |
 |---|---|
 | `QRPGLESRC` | `MOCKENG`, `MOCKGEN` (SQLRPGLE), `MOCKCDC`, copybooks `MOCKENG_H` and `MOCK_H` |
-| `QCLLESRC` | `MCK*C` command processing programs, `MOCKINST` installer |
+| `QCLLESRC` | `BUILD`, `MOCKINST`, `MCK*C` command processing programs |
 | `QCMDSRC` | The `MOCK*` command definitions |
 | `QSRVSRC` | `MOCKENG` binder source |
 
-Test and demo members live in the same folders (`DEMO*`, `*_T`, `MOCKTST_H`,
-`MOCKTEST`, `MOCKDEMO`) and are only uploaded with `-t`.
+Test and demo members live in the same folders: `DEMO*`, `*_T`, `MOCKTST_H`,
+`MOCKTEST` and `MOCKDEMO`.
 
-To build without the scripts, put the members in the four source files of a
-library and run `CALL RPGMOCK/MOCKINST PARM('RPGMOCK')`. An optional second
-parameter names a different library holding the source files. The build creates:
+### Build from the repository
+
+1. Put the repository in the IFS, for example with git in PASE:
+   ```
+   git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
+   ```
+   Or download it and copy the folders to the IFS.
+2. Compile the build program straight from the IFS:
+   ```
+   CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
+   ```
+3. Run it, naming the library to build into and the repository directory:
+   ```
+   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock')
+   CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')
+   ```
+   The third parameter `*YES` also runs the self-tests.
+
+`BUILD` does the following:
+1. Creates the library if it doesn't exist, plus the four source files.
+2. Copies every file into a member of the same name, using the extension as the
+   source type (for example `MOCKENG.sqlrpgle` becomes `MOCKENG`, type
+   `SQLRPGLE`). The copy is logged to `build.log` in the repository directory.
+3. Compiles and runs `MOCKINST`.
+
+- A quoted `CALL` parameter is only reliable up to 32 characters. For a longer
+  path, run `CHGCURDIR DIR('/the/long/path/IBMiMock')` and pass `'*CURDIR'`,
+  which is also the default.
+- The self-tests change the current library and library list of the job that
+  runs them.
+
+### Rebuild from source members
+
+If the members are already in the source files (after editing them with SEU or
+RDi, for example), rebuild with `CALL RPGMOCK/MOCKINST PARM('RPGMOCK')`. An
+optional second parameter names a different library holding the source files.
+
+The build creates:
 
 | Object | Purpose |
 |---|---|
@@ -267,4 +295,4 @@ built-in harness instead of RPGUnit.
 | `QCLLESRC/MOCKTEST` → `QRPGLESRC/MOCKENG_T` | Codec round trips for every type, rejected values, decimal data errors, matchers |
 | `QCLLESRC/MOCKDEMO` → `QRPGLESRC/DEMOCUT_T` | End to end: a hidden-mock check, `*PGM` and strict `*SRVPGM` mocks, stubs, throws, consecutive returns, argument capture, verification messages, CL `MOCKCOUNT`/`MOCKGETARG`/`MOCKVERIFY`, bad-binding detection, cleanup |
 
-Run both with `bash bin/install-rpgmock.sh -l RPGMOCK -t`, or on the system with `CALL RPGMOCK/MOCKTEST` and `CALL RPGMOCK/MOCKDEMO`.
+Run both with `CALL QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')`, or after a build with `CALL RPGMOCK/MOCKTEST PARM('RPGMOCK')` and `CALL RPGMOCK/MOCKDEMO PARM('RPGMOCK')`.
