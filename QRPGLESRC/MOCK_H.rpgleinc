@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCK_H - RPGMOCK API for test programs (RPGUnit or plain RPG)
+// MOCK_H - IBMIMOCK API for test programs (RPGUnit or plain RPG)
 //
 //   Bind with service program MOCKENG (BNDSRVPGM or a binding dir).
 //

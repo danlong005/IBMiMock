@@ -1,5 +1,5 @@
-/* MOCKWHEN - RPGMOCK: stub behavior (when ... then return/throw)    */
-             CMD        PROMPT('RPGMOCK - When called')
+/* MOCKWHEN - IBMIMOCK: stub behavior (when ... then return/throw)   */
+             CMD        PROMPT('IBMIMOCK - When called')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Mock')
              PARM       KWD(PROC) TYPE(*CHAR) LEN(256) DFT(*PGM) +

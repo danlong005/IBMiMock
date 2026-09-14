@@ -1,5 +1,5 @@
-/* MOCKPROC - RPGMOCK: declare a procedure of a *SRVPGM mock         */
-             CMD        PROMPT('RPGMOCK - Declare procedure')
+/* MOCKPROC - IBMIMOCK: declare a procedure of a *SRVPGM mock        */
+             CMD        PROMPT('IBMIMOCK - Declare procedure')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Service program mock')
              PARM       KWD(PROC) TYPE(*CHAR) LEN(256) MIN(1) +

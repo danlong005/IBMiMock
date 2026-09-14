@@ -1,5 +1,5 @@
-/* MOCKVERIFY - RPGMOCK: verify calls (escape MCK0200 on failure)    */
-             CMD        PROMPT('RPGMOCK - Verify calls')
+/* MOCKVERIFY - IBMIMOCK: verify calls (escape MCK0200 on failure)   */
+             CMD        PROMPT('IBMIMOCK - Verify calls')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Mock')
              PARM       KWD(PROC) TYPE(*CHAR) LEN(256) DFT(*PGM) +

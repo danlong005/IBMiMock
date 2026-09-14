@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// MOCKENG_T - RPGMOCK engine unit tests: codec, layouts, matchers.
+// MOCKENG_T - IBMIMOCK engine unit tests: codec, layouts, matchers.
 // Run with MOCKTEST.
 // ------------------------------------------------------------------
 ctl-opt main(runTests) option(*srcstmt:*nodebugio) decprec(63);

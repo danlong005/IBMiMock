@@ -1,5 +1,5 @@
-/* MOCKCHK - RPGMOCK: diagnose library list and binding problems     */
-             CMD        PROMPT('RPGMOCK - Check mocks')
+/* MOCKCHK - IBMIMOCK: diagnose library list and binding problems    */
+             CMD        PROMPT('IBMIMOCK - Check mocks')
              PARM       KWD(PGM) TYPE(QPGM) DFT(*NONE) +
                           SNGVAL((*NONE)) +
                           PROMPT('Program or service program')

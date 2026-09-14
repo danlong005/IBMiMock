@@ -1,4 +1,4 @@
-/* MOCKBUILD - RPGMOCK: generate and create a *SRVPGM mock in QTEMP  */
-             CMD        PROMPT('RPGMOCK - Build srvpgm mock')
+/* MOCKBUILD - IBMIMOCK: generate and create a *SRVPGM mock in QTEMP */
+             CMD        PROMPT('IBMIMOCK - Build srvpgm mock')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Service program mock')

@@ -1,7 +1,7 @@
 /* ---------------------------------------------------------------- */
-/* MOCKTEST - build and run the RPGMOCK engine unit tests           */
-/*   CALL MOCKTEST PARM('RPGMOCK' 'SRCLIB')                         */
-/*   1: RPGMOCK library (default: current library)                  */
+/* MOCKTEST - build and run the IBMIMOCK engine unit tests          */
+/*   CALL MOCKTEST PARM('IBMIMOCK' 'SRCLIB')                        */
+/*   1: IBMIMOCK library (default: current library)                 */
 /*   2: library holding the source files (default: parameter 1)     */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&PLIB &PSRCLIB)

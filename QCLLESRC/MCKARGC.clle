@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKARGC - RPGMOCK command processing program for MOCKGETARG      */
+/* MCKARGC - IBMIMOCK command processing program for MOCKGETARG     */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &PARM &RTNVAL &PROC &CALL)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

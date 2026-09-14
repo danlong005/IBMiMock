@@ -1,6 +1,6 @@
 # IBMiMock
 
-**RPGMOCK** is a mocking framework for RPG unit tests on IBM i, in the spirit of
+**IBMIMOCK** is a mocking framework for RPG unit tests on IBM i, in the spirit of
 Mockito and Moq.
 
 Your CL test driver runs a few commands. They replace the programs and service
@@ -33,7 +33,7 @@ MOCKRMV
   mocks once per driver and restub them in every test.
 - **Works from CL and RPG.** The commands run in CL drivers, and the `MOCK_H`
   copybook wraps them for RPGUnit (or any RPG) tests.
-- **Built-in safety checks.** RPGMOCK tells you when a mock would be ignored
+- **Built-in safety checks.** IBMIMOCK tells you when a mock would be ignored
   because the library list or a hard-coded binding bypasses QTEMP.
 
 ## Quick start
@@ -44,13 +44,13 @@ On the IBM i (IBM i 7.4 or later):
 git clone https://github.com/danlong005/IBMiMock.git /home/ME/IBMiMock
 
 CRTBNDCL PGM(QTEMP/BUILD) SRCSTMF('/home/ME/IBMiMock/QCLLESRC/BUILD.clle')
-CALL     QTEMP/BUILD PARM('RPGMOCK' '/home/ME/IBMiMock' '*YES')
+CALL     QTEMP/BUILD PARM('IBMIMOCK' '/home/ME/IBMiMock' '*YES')
 ```
 
 `BUILD` creates the library and its source files, copies the repository into
 source members, compiles everything, and (with `'*YES'`) runs the self-tests.
-Then add `RPGMOCK` to your test driver's library list, and bind your test
-programs to service program `RPGMOCK/MOCKENG`.
+Then add `IBMIMOCK` to your test driver's library list, and bind your test
+programs to service program `IBMIMOCK/MOCKENG`.
 
 A test in RPG looks like this:
 

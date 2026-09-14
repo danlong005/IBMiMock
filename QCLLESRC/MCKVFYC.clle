@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKVFYC - RPGMOCK command processing program for MOCKVERIFY      */
+/* MCKVFYC - IBMIMOCK command processing program for MOCKVERIFY     */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &PROC &ARGS &TIMES)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)

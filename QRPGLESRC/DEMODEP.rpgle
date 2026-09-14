@@ -1,6 +1,6 @@
 **free
 // ------------------------------------------------------------------
-// DEMODEP - RPGMOCK demo dependency (*PGM): customer lookup.
+// DEMODEP - IBMIMOCK demo dependency (*PGM): customer lookup.
 // The "real" program only knows customer REAL01.
 // ------------------------------------------------------------------
 ctl-opt dftactgrp(*no) actgrp(*caller);

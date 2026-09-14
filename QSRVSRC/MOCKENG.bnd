@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------- */
-/* MOCKENG - binder source for service program MOCKENG (RPGMOCK)    */
+/* MOCKENG - binder source for service program MOCKENG (IBMIMOCK)   */
 /* Append new exports at the end; never reorder or remove.          */
 /* ---------------------------------------------------------------- */
-STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('RPGMOCK V1')
+STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('IBMIMOCK V1')
   /* stub runtime */
   EXPORT     SYMBOL(MOCK_INVOKE)
   /* public API for test programs (MOCK_H) */

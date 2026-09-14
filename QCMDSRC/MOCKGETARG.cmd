@@ -1,5 +1,5 @@
-/* MOCKGETARG - RPGMOCK: capture an argument into a CL variable      */
-             CMD        PROMPT('RPGMOCK - Get argument')
+/* MOCKGETARG - IBMIMOCK: capture an argument into a CL variable     */
+             CMD        PROMPT('IBMIMOCK - Get argument')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Mock')
              PARM       KWD(PARM) TYPE(*INT2) RANGE(1 64) MIN(1) +

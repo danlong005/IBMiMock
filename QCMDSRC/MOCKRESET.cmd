@@ -1,5 +1,5 @@
-/* MOCKRESET - RPGMOCK: clear recorded calls and/or stubs            */
-             CMD        PROMPT('RPGMOCK - Reset mocks')
+/* MOCKRESET - IBMIMOCK: clear recorded calls and/or stubs           */
+             CMD        PROMPT('IBMIMOCK - Reset mocks')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) DFT(*ALL) +
                           SPCVAL((*ALL)) PROMPT('Mock')
              PARM       KWD(SCOPE) TYPE(*CHAR) LEN(7) RSTD(*YES) +

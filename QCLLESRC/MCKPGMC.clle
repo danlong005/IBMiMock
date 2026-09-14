@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------- */
-/* MCKPGMC - RPGMOCK command processing program for MOCKPGM         */
+/* MCKPGMC - IBMIMOCK command processing program for MOCKPGM        */
 /* ---------------------------------------------------------------- */
              PGM        PARM(&OBJ &PARMS &BEHAVIOR)
              DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)
@@ -88,7 +88,7 @@
 /* ---- ensure QTEMP/MOCKSRC(&OBJ) exists and is empty ------------ */
              SUBR       SUBR(SRCMBR)
              CRTSRCPF   FILE(QTEMP/MOCKSRC) RCDLEN(240) +
-                          TEXT('RPGMOCK generated stubs')
+                          TEXT('IBMIMOCK generated stubs')
              MONMSG     MSGID(CPF7302)
              ADDPFM     FILE(QTEMP/MOCKSRC) MBR(&OBJ) SRCTYPE(RPGLE)
              MONMSG     MSGID(CPF5812 CPF7306) EXEC(CLRPFM +

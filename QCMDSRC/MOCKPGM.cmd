@@ -1,5 +1,5 @@
-/* MOCKPGM - RPGMOCK: create a *PGM mock in QTEMP                    */
-             CMD        PROMPT('RPGMOCK - Mock a program')
+/* MOCKPGM - IBMIMOCK: create a *PGM mock in QTEMP                   */
+             CMD        PROMPT('IBMIMOCK - Mock a program')
              PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
                           PROMPT('Program to mock')
              PARM       KWD(PARMS) TYPE(PDEF) MAX(64) +
