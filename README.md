@@ -87,7 +87,19 @@ physical file.
 | `QCLLESRC` | `BUILD`, the `MOCKINST` installer, command processing programs `MCK*C` |
 | `QCMDSRC` | Command definitions `MOCKPGM` … `MOCKCHK` |
 | `QSRVSRC` | Binder source for `MOCKENG` |
+| `examples` | Example code, in the same source-file folders (`QRPGLESRC`, `QCLLESRC`, `QSRVSRC`) |
 | `docs` | Programmer's Guide |
 
-The self-tests and demo live in the same folders: `MOCKTEST`/`MOCKENG_T` are
-engine unit tests, and `MOCKDEMO`/`DEMO*` are the end-to-end demo.
+The engine's unit tests, `MOCKTEST` and `MOCKENG_T` (with the `MOCKTST_H`
+harness), stay with the library code. The `examples` folder holds an end-to-end
+example you can copy from:
+
+| Member | Role |
+|---|---|
+| `DEMOCUT` | Code under test |
+| `DEMODEP` | Program dependency |
+| `DEMOSRV` | Service program dependency |
+| `DEMOCUT_T` | Tests |
+| `MOCKDEMO` | CL driver |
+
+`BUILD` copies and runs the examples only when you pass `'*YES'`.
