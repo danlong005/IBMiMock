@@ -8,9 +8,10 @@
 Mockito and Moq.
 
 Your CL test driver runs a few commands. They replace the programs and service
-programs your code calls with **mocks in QTEMP**. Your tests decide what those
-mocks return, check how they were called, and remove them when done. It needs
-no changes to the code under test, and no real customers, tax tables or files.
+programs your code calls with **mocks in QTEMP**, or in a library you choose.
+Your tests decide what those mocks return, check how they were called, and
+remove them when done. It needs no changes to the code under test, and no real
+customers, tax tables or files.
 
 ```
 IMOQPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
@@ -38,8 +39,13 @@ IMOQRMV
   mocks once per driver and restub them in every test.
 - **Works from CL and RPG.** The commands run in CL drivers, and the `IMOQ_H`
   copybook wraps them for RPGUnit (or any RPG) tests.
+- **Mocks in QTEMP or any library.** Mocks go in QTEMP by default, so they
+  disappear with the job. `IMOQPGM` and `IMOQSRVPGM` take `LIB(name)` to create
+  them in another library instead. iMoq never replaces a real object: it only
+  touches objects it created (text `iMoq mock`). See
+  [Creating mocks in another library](docs/PROGRAMMERS_GUIDE.md#creating-mocks-in-another-library).
 - **Built-in safety checks.** iMoq tells you when a mock would be ignored
-  because the library list or a hard-coded binding bypasses QTEMP.
+  because the library list or a hard-coded binding bypasses it.
 
 ## Quick start
 
