@@ -1,0 +1,70 @@
+**free
+// ------------------------------------------------------------------
+// EXAMPLE_H - shared declarations for the IBMiMock feature examples
+//
+// The examples call these dependencies directly so each one can
+// focus on a single feature. None of them exists as a real object:
+// the EXAMPLES driver creates all three as mocks in QTEMP.
+//
+//   EXCUST   *PGM     customer lookup      MOCKPGM
+//   EXAUDIT  *PGM     audit trail          MOCKPGM BEHAVIOR(*STRICT)
+//   EXPRICE  *SRVPGM  pricing service      MOCKSRVPGM + MOCKPROC
+// ------------------------------------------------------------------
+
+// EXCUST: look up a customer name
+dcl-pr getCustomer extpgm('EXCUST');
+  custId char(5) const;
+  name char(30);
+  found ind;
+end-pr;
+
+// EXAUDIT: record an audit event
+dcl-pr writeAudit extpgm('EXAUDIT');
+  event char(20) const;
+end-pr;
+
+// EXPRICE procedures
+dcl-pr getPrice packed(7:2) extproc('EX_PRICE');
+  item char(5) const;
+end-pr;
+
+dcl-pr getDiscount packed(7:2) extproc('EX_DISCOUNT');
+  amount packed(7:2) const;
+  code char(10) const options(*nopass:*omit);
+end-pr;
+
+dcl-pr logMessage extproc('EX_LOG');
+  text char(50) const;
+end-pr;
+
+// ------------------------------------------------------------------
+// expect(condition : description)
+// Stops the example with an escape message when condition is false.
+// ------------------------------------------------------------------
+dcl-proc expect;
+  dcl-pi *n;
+    condition ind const;
+    description varchar(200) const;
+  end-pi;
+
+  dcl-pr sendMessage extpgm('QMHSNDPM');
+    msgId char(7) const;
+    msgFile char(20) const;
+    msgData char(200) const;
+    msgDataLen int(10) const;
+    msgType char(10) const;
+    callStack char(10) const;
+    callStackCounter int(10) const;
+    msgKey char(4);
+    errorCode char(8);
+  end-pr;
+  dcl-s key char(4);
+  dcl-s noErrorCode char(8) inz(*allx'00');
+
+  if not condition;
+    // *CTLBDY: send the escape to whoever called the example program
+    sendMessage('CPF9898' : 'QCPFMSG   *LIBL' : description
+               : %len(description) : '*ESCAPE' : '*CTLBDY' : 1
+               : key : noErrorCode);
+  endif;
+end-proc;

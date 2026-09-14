@@ -67,6 +67,10 @@ end-proc;
 
 ## Documentation
 
+New to mocking on IBM i? Start with the **[Examples](docs/EXAMPLES.md)**:
+about fifteen short programs, each showing one feature, with the key code
+explained.
+
 The **[Programmer's Guide](docs/PROGRAMMERS_GUIDE.md)** covers everything:
 - how mocks replace real objects, and the rules that make that work
 - installing and rebuilding
@@ -87,19 +91,14 @@ physical file.
 | `QCLLESRC` | `BUILD`, the `MOCKINST` installer, command processing programs `MCK*C` |
 | `QCMDSRC` | Command definitions `MOCKPGM` … `MOCKCHK` |
 | `QSRVSRC` | Binder source for `MOCKENG` |
-| `examples` | Example code, in the same source-file folders (`QRPGLESRC`, `QCLLESRC`, `QSRVSRC`) |
-| `docs` | Programmer's Guide |
+| `examples` | Example code ([documented here](docs/EXAMPLES.md)), in the same source-file folders (`QRPGLESRC`, `QCLLESRC`, `QSRVSRC`) |
+| `docs` | Programmer's Guide and Examples |
 
 The engine's unit tests, `MOCKTEST` and `MOCKENG_T` (with the `MOCKTST_H`
-harness), stay with the library code. The `examples` folder holds an end-to-end
-example you can copy from:
-
-| Member | Role |
-|---|---|
-| `DEMOCUT` | Code under test |
-| `DEMODEP` | Program dependency |
-| `DEMOSRV` | Service program dependency |
-| `DEMOCUT_T` | Tests |
-| `MOCKDEMO` | CL driver |
+harness), stay with the library code. The `examples` folder holds two kinds of
+example:
+- **Feature examples:** `EX*` members, run by `EXAMPLES`, one feature each.
+- **End-to-end demo:** code under test `DEMOCUT`, its dependencies `DEMODEP`
+  and `DEMOSRV`, tests `DEMOCUT_T`, and driver `MOCKDEMO`.
 
 `BUILD` copies and runs the examples only when you pass `'*YES'`.

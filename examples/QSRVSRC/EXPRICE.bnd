@@ -1,0 +1,8 @@
+/* EXPRICE - binder source for the pretend pricing service used by  */
+/* the IBMiMock feature examples. No real EXPRICE is needed:        */
+/* MOCKSRVPGM builds the mock from this binder source.              */
+STRPGMEXP  PGMLVL(*CURRENT) SIGNATURE('EXPRICE V1')
+  EXPORT     SYMBOL(EX_PRICE)
+  EXPORT     SYMBOL(EX_DISCOUNT)
+  EXPORT     SYMBOL(EX_LOG)
+ENDPGMEXP

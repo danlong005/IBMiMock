@@ -1,0 +1,50 @@
+/* ---------------------------------------------------------------- */
+/* EXCL - Use the mocks from a CL program                           */
+/*                                                                  */
+/* Features: MOCKWHEN, MOCKCOUNT, MOCKGETARG and MOCKVERIFY with     */
+/*           MONMSG. MOCKCOUNT and MOCKGETARG return values into CL */
+/*           variables, so they only work in CL programs.           */
+/* ---------------------------------------------------------------- */
+             PGM
+             DCL        VAR(&NAME) TYPE(*CHAR) LEN(30)
+             DCL        VAR(&FOUND) TYPE(*CHAR) LEN(1)
+             DCL        VAR(&COUNT) TYPE(*DEC) LEN(10 0)
+             DCL        VAR(&ARG) TYPE(*CHAR) LEN(256)
+             DCL        VAR(&FAILED) TYPE(*LGL) VALUE('0')
+
+             MOCKRESET
+
+/* When EXCUST is called for C0042, fill in the name and found flag */
+             MOCKWHEN   OBJ(EXCUST) ARGS((1 *EQ C0042)) +
+                          SETPARM((2 'Grace Hopper') (3 '1'))
+
+             CALL       PGM(EXCUST) PARM('C0042' &NAME &FOUND)
+             IF         COND(&NAME *NE 'Grace Hopper' *OR &FOUND *NE +
+                          '1') THEN(SNDPGMMSG MSGID(CPF9898) +
+                          MSGF(QCPFMSG) MSGDTA('SETPARM values +
+                          were not returned') MSGTYPE(*ESCAPE))
+
+/* How many calls, and what was passed? */
+             MOCKCOUNT  OBJ(EXCUST) RTNVAL(&COUNT)
+             IF         COND(&COUNT *NE 1) THEN(SNDPGMMSG +
+                          MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('MOCKCOUNT should be 1') +
+                          MSGTYPE(*ESCAPE))
+             MOCKGETARG OBJ(EXCUST) PARM(1) CALL(*LAST) RTNVAL(&ARG)
+             IF         COND(&ARG *NE 'C0042') THEN(SNDPGMMSG +
+                          MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('MOCKGETARG should return C0042') +
+                          MSGTYPE(*ESCAPE))
+
+/* A passing verification returns normally ... */
+             MOCKVERIFY OBJ(EXCUST) ARGS((1 *EQ C0042)) TIMES(*ONCE)
+
+/* ... a failing one sends MCK0200, which you can monitor */
+             MOCKVERIFY OBJ(EXCUST) TIMES(*NEVER)
+             MONMSG     MSGID(MCK0200) EXEC(CHGVAR VAR(&FAILED) +
+                          VALUE('1'))
+             IF         COND(*NOT &FAILED) THEN(SNDPGMMSG +
+                          MSGID(CPF9898) MSGF(QCPFMSG) +
+                          MSGDTA('TIMES(*NEVER) should have failed') +
+                          MSGTYPE(*ESCAPE))
+             ENDPGM

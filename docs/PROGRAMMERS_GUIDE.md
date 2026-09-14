@@ -7,6 +7,7 @@ IBMIMOCK gives your CL test driver commands that put stand-in objects in QTEMP. 
 | Commands and engine | `MOCK*` commands, service program `MOCKENG` |
 | Copybook for RPG tests | `MOCK_H` |
 | Requires | IBM i 7.4 or later |
+| Examples | [One short example per feature](EXAMPLES.md) |
 | Project | [IBMiMock on GitHub](../README.md) |
 
 ## Contents
@@ -121,9 +122,10 @@ An optional second parameter names a different library holding the four source f
 | Driver | Tests | What it covers |
 |---|---|---|
 | `MOCKTEST` | `MOCKENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
+| `EXAMPLES` (from `examples/`) | `EXPGM` … `EXFAILMSG`, `EXCL` | One small example per feature; see [Examples](EXAMPLES.md) |
 | `MOCKDEMO` (from `examples/`) | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
 
-Run them with `BUILD` and `'*YES'`, which also copies the example source from the repository's `examples` folder into the library. After a build, you can also run them with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')` and `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
+Run them with `BUILD` and `'*YES'`, which also copies the example source from the repository's `examples` folder into the library. After a build, you can also run them with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')`, `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')` and `CALL IBMIMOCK/EXAMPLES PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` and `EXAMPLES` change the current library and library list of the job that runs them.
 
 ---
 

@@ -18,9 +18,10 @@
 /*      A quoted CALL parameter is only reliable up to 32            */
 /*      characters; use CHGCURDIR and *CURDIR for longer paths.      */
 /*   3  *YES also copies the example code from examples/ and runs   */
-/*      the unit tests (MOCKTEST) and the demo (MOCKDEMO). Default  */
-/*      *NO. The demo changes the current library and library list  */
-/*      of the job that runs it.                                    */
+/*      the unit tests (MOCKTEST), the demo (MOCKDEMO) and the      */
+/*      feature examples (EXAMPLES). Default *NO. The demo and the  */
+/*      examples change the current library and library list of the */
+/*      job that runs them.                                         */
 /*                                                                  */
 /* Steps: create the library and the source files QRPGLESRC,        */
 /* QCLLESRC, QCMDSRC and QSRVSRC; copy every file in the matching   */
@@ -146,6 +147,8 @@
              CHGVAR     VAR(&PGM) VALUE('MOCKTEST')
              CALLSUBR   SUBR(RUNTEST)
              CHGVAR     VAR(&PGM) VALUE('MOCKDEMO')
+             CALLSUBR   SUBR(RUNTEST)
+             CHGVAR     VAR(&PGM) VALUE('EXAMPLES')
              CALLSUBR   SUBR(RUNTEST)
              ENDDO
 
