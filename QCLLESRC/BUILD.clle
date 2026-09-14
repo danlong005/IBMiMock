@@ -17,14 +17,16 @@
 /*   2  IFS directory holding the repository, or *CURDIR (default). */
 /*      A quoted CALL parameter is only reliable up to 32            */
 /*      characters; use CHGCURDIR and *CURDIR for longer paths.      */
-/*   3  *YES also runs the unit tests (MOCKTEST) and the demo       */
-/*      (MOCKDEMO). Default *NO. The demo changes the current       */
-/*      library and library list of the job that runs it.           */
+/*   3  *YES also copies the example code from examples/ and runs   */
+/*      the unit tests (MOCKTEST) and the demo (MOCKDEMO). Default  */
+/*      *NO. The demo changes the current library and library list  */
+/*      of the job that runs it.                                    */
 /*                                                                  */
 /* Steps: create the library and the source files QRPGLESRC,        */
 /* QCLLESRC, QCMDSRC and QSRVSRC; copy every file in the matching   */
-/* repository folder into a member of the same name (the extension  */
-/* becomes the source type); compile and run MOCKINST, which builds */
+/* repository folder (and examples/ folder with *YES) into a        */
+/* member of the same name, the extension becoming the source type; */
+/* compile and run MOCKINST, which builds                           */
 /* the commands, programs, service program and message file.        */
 /* The copy step writes its output to build.log in the directory.   */
 /* ---------------------------------------------------------------- */
@@ -41,6 +43,7 @@
              DCL        VAR(&PGM) TYPE(*CHAR) LEN(10)
              DCL        VAR(&SH) TYPE(*CHAR) LEN(2000)
              DCL        VAR(&CMD) TYPE(*CHAR) LEN(200)
+             DCL        VAR(&EXDIRS) TYPE(*CHAR) LEN(60)
              DCL        VAR(&MSG) TYPE(*CHAR) LEN(512)
              DCL        VAR(&STEP) TYPE(*CHAR) LEN(60)
 
@@ -91,6 +94,10 @@
 /* Each file becomes a member named after the file (upper case)     */
 /* with the extension as source type: MOCKENG.sqlrpgle -> MOCKENG   */
 /* SQLRPGLE. Qshell stops at the first file that fails to copy.     */
+/* The examples (used by MOCKDEMO) are copied only with *YES        */
+             IF         COND(&RUNTESTS *EQ '*YES') THEN(CHGVAR +
+                          VAR(&EXDIRS) VALUE('examples/QRPGLESRC +
+                          examples/QCLLESRC examples/QSRVSRC'))
              CHGVAR     VAR(&STEP) VALUE('copying source from' *BCAT +
                           &PATH)
              ADDENVVAR  ENVVAR(QIBM_QSH_CMD_ESCAPE_MSG) VALUE(Y) +
@@ -102,20 +109,22 @@
                           *TCAT ''' || exit 1; +
                           rm -f build.log; touch -C 819 build.log; +
                           ( for d in QRPGLESRC QCLLESRC QCMDSRC +
-                          QSRVSRC; do for f in $d/*.*; do +
+                          QSRVSRC ' *CAT &EXDIRS *TCAT '; do +
+                          s=$(basename $d); for f in $d/*.*; do +
+                          test -f "$f" || continue; +
                           m=$(basename "${f%.*}" | tr a-z A-Z); +
                           t=$(echo "${f##*.}" | tr a-z A-Z); +
                           echo "$d/$m ($t)"; +
                           system "ADDPFM FILE(' *CAT %TRIMR(&LIB) +
-                          *TCAT '/$d) MBR($m) SRCTYPE($t)" +
+                          *TCAT '/$s) MBR($m) SRCTYPE($t)" +
                           >/dev/null 2>&1; +
                           system "CPYFRMSTMF FROMSTMF(''$PWD/$f'') +
                           TOMBR(''/QSYS.LIB/' *CAT %TRIMR(&LIB) +
-                          *TCAT '.LIB/$d.FILE/$m.MBR'') +
+                          *TCAT '.LIB/$s.FILE/$m.MBR'') +
                           MBROPT(*REPLACE) STMFCCSID(1208) +
                           DBFCCSID(*FILE)" || exit 1; +
                           system "CHGPFM FILE(' *CAT %TRIMR(&LIB) +
-                          *TCAT '/$d) MBR($m) SRCTYPE($t)" +
+                          *TCAT '/$s) MBR($m) SRCTYPE($t)" +
                           >/dev/null 2>&1; +
                           done; done ) >> build.log 2>&1')
              QSH        CMD(&SH)

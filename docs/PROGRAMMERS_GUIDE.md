@@ -121,9 +121,9 @@ An optional second parameter names a different library holding the four source f
 | Driver | Tests | What it covers |
 |---|---|---|
 | `MOCKTEST` | `MOCKENG_T` | Value conversion for every type, rejected values, decimal data errors, matchers |
-| `MOCKDEMO` | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
+| `MOCKDEMO` (from `examples/`) | `DEMOCUT_T` with `DEMOCUT`, `DEMODEP`, `DEMOSRV` | End to end: hidden-mock detection, program and strict service program mocks, stubs, throws, consecutive returns, argument capture, verification messages, the CL-only commands, bad-binding detection, cleanup |
 
-Run them with `BUILD` and `'*YES'`, or after a build with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')` and `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
+Run them with `BUILD` and `'*YES'`, which also copies the example source from the repository's `examples` folder into the library. After a build, you can also run them with `CALL IBMIMOCK/MOCKTEST PARM('IBMIMOCK')` and `CALL IBMIMOCK/MOCKDEMO PARM('IBMIMOCK')`. Each sends a diagnostic message per test to the job log and ends with a completion message, or with an escape message giving the number of failures. `MOCKDEMO` changes the current library and library list of the job that runs it.
 
 ---
 
@@ -156,7 +156,7 @@ QTEMP belongs to a job. Creating mocks in one SSH session and running tests in a
 
 ## 4. Your first mocked test
 
-The walkthrough uses a small order-pricing service. The same scenario ships as a runnable demo in the IBMIMOCK library (`DEMOCUT`, `DEMODEP`, `DEMOSRV` in `QRPGLESRC`; driver `MOCKDEMO` in `QCLLESRC`). Run `CALL IBMIMOCK/MOCKDEMO` to see it pass.
+The walkthrough uses a small order-pricing service. The same scenario ships as a runnable example in the repository's `examples` folder: `DEMOCUT`, `DEMODEP`, `DEMOSRV` and `DEMOCUT_T` in `examples/QRPGLESRC`, driver `MOCKDEMO` in `examples/QCLLESRC`. `BUILD` with `'*YES'` copies it into the library, and then `CALL IBMIMOCK/MOCKDEMO` shows it passing.
 
 ### Step 1: Read the code under test
 
@@ -436,7 +436,7 @@ Captured values are text: numbers are normalized (`25.50`, `-1`), trailing blank
 
 ## 8. Writing tests in RPG
 
-Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a complete working example, see `QRPGLESRC/DEMOCUT_T` (driven by `QCLLESRC/MOCKDEMO`). Every MOCK command runs through one of two wrappers:
+Copy `MOCK_H` into the test module and bind service program `MOCKENG`. For a complete working example, see `examples/QRPGLESRC/DEMOCUT_T.rpgle` (driven by `examples/QCLLESRC/MOCKDEMO.clle`). Every MOCK command runs through one of two wrappers:
 
 | Procedure | On failure | Use it for |
 |---|---|---|
