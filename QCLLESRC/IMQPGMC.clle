@@ -1,11 +1,14 @@
 /* ---------------------------------------------------------------- */
 /* IMQPGMC - iMoq command processing program for IMOQPGM            */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&OBJ &PARMS &BEHAVIOR &MOCKLIB)
-             DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)
+             PGM        PARM(&OBJQ &PARMS &BEHAVIOR)
+             DCL        VAR(&OBJQ) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10) STG(*DEFINED) +
+                          DEFVAR(&OBJQ 1)
+             DCL        VAR(&MOCKLIB) TYPE(*CHAR) LEN(10) +
+                          STG(*DEFINED) DEFVAR(&OBJQ 11)
              DCL        VAR(&PARMS) TYPE(*CHAR) LEN(2000)
              DCL        VAR(&BEHAVIOR) TYPE(*CHAR) LEN(7)
-             DCL        VAR(&MOCKLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&TEXT) TYPE(*CHAR) LEN(50)
              DCL        VAR(&REALLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&HITLIB) TYPE(*CHAR) LEN(10)
@@ -138,7 +141,7 @@
                           *BCAT 'already exists and is not an +
                           iMoq mock, so it will not be replaced. +
                           Create the mock in another library with +
-                          LIB().')
+                          OBJ(library/name).')
              CHGVAR     VAR(&CLMSGID) VALUE('IMQ0016')
              RTNSUBR
              ENDDO

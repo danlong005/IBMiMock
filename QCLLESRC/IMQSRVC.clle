@@ -1,9 +1,12 @@
 /* ---------------------------------------------------------------- */
 /* IMQSRVC - iMoq command processing program for IMOQSRVPGM         */
 /* ---------------------------------------------------------------- */
-             PGM        PARM(&OBJ &BEHAVIOR &SRCQ &SRCMBR &SIG +
-                          &MOCKLIB)
-             DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10)
+             PGM        PARM(&OBJQ &BEHAVIOR &SRCQ &SRCMBR &SIG)
+             DCL        VAR(&OBJQ) TYPE(*CHAR) LEN(20)
+             DCL        VAR(&OBJ) TYPE(*CHAR) LEN(10) STG(*DEFINED) +
+                          DEFVAR(&OBJQ 1)
+             DCL        VAR(&MOCKLIB) TYPE(*CHAR) LEN(10) +
+                          STG(*DEFINED) DEFVAR(&OBJQ 11)
              DCL        VAR(&BEHAVIOR) TYPE(*CHAR) LEN(7)
              DCL        VAR(&SRCQ) TYPE(*CHAR) LEN(20)
              DCL        VAR(&SRCFILE) TYPE(*CHAR) LEN(10) +
@@ -12,7 +15,6 @@
                           STG(*DEFINED) DEFVAR(&SRCQ 11)
              DCL        VAR(&SRCMBR) TYPE(*CHAR) LEN(10)
              DCL        VAR(&SIG) TYPE(*CHAR) LEN(16)
-             DCL        VAR(&MOCKLIB) TYPE(*CHAR) LEN(10)
              DCL        VAR(&TEXT) TYPE(*CHAR) LEN(50)
              DCL        VAR(&OBJTYPE) TYPE(*CHAR) LEN(10) +
                           VALUE('*SRVPGM')
@@ -108,7 +110,7 @@
                           *BCAT 'already exists and is not an +
                           iMoq mock, so it will not be replaced. +
                           Create the mock in another library with +
-                          LIB().')
+                          OBJ(library/name).')
              CHGVAR     VAR(&CLMSGID) VALUE('IMQ0016')
              RTNSUBR
              ENDDO

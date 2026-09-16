@@ -1,6 +1,6 @@
 /* IMOQSRVPGM - iMoq: start a *SRVPGM mock (build with IMOQBUILD) */
              CMD        PROMPT('iMoq - Mock a srvpgm')
-             PARM       KWD(OBJ) TYPE(*NAME) LEN(10) MIN(1) +
+             PARM       KWD(OBJ) TYPE(QOBJ) MIN(1) +
                           PROMPT('Service program to mock')
              PARM       KWD(BEHAVIOR) TYPE(*CHAR) LEN(7) RSTD(*YES) +
                           DFT(*LOOSE) VALUES(*LOOSE *STRICT) +
@@ -13,7 +13,8 @@
              PARM       KWD(SIGNATURE) TYPE(*CHAR) LEN(16) DFT(*GEN) +
                           SPCVAL((*GEN)) CASE(*MIXED) +
                           PROMPT('Signature for SRCFILE(*NONE)')
-             PARM       KWD(LIB) TYPE(*NAME) LEN(10) DFT(QTEMP) +
+ QOBJ:       QUAL       TYPE(*NAME) LEN(10) MIN(1)
+             QUAL       TYPE(*NAME) LEN(10) DFT(QTEMP) +
                           PROMPT('Library for the mock')
  QSRC:       QUAL       TYPE(*NAME) LEN(10)
              QUAL       TYPE(*NAME) LEN(10) DFT(*LIBL) +

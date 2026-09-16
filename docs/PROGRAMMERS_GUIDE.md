@@ -486,13 +486,22 @@ Copy `IMOQ_H` into the test module and bind service program `IMOQENG`. For a com
 
 ### Creating mocks in another library
 
-Mocks go in QTEMP unless you say otherwise. `IMOQPGM` and `IMOQSRVPGM` take `LIB(name)` to create the mock object somewhere else:
+Mocks go in QTEMP unless you say otherwise. Qualify the name on `IMOQPGM` or `IMOQSRVPGM` to create the mock object somewhere else:
 
 ```
-IMOQPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND)) LIB(TESTLIB)
+IMOQPGM    OBJ(TESTLIB/CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND))
+IMOQSRVPGM OBJ(TESTLIB/TAXSRV) SRCFILE(*RTV)
+```
+
+The library qualifier says where the *mock* is created. The real object is still found through the library list, and the commands that follow refer to the mock by its name alone — iMoq remembers which library it went into:
+
+```
+IMOQWHEN   OBJ(CUSTLKUP) ARGS((1 *EQ C001)) SETPARM((2 'ACME'))
+IMOQRMV    OBJ(CUSTLKUP)
 ```
 
 - **Safety:** iMoq gives every mock object the text `iMoq mock`, and only replaces or deletes objects with that text. If `TESTLIB` already holds a real `CUSTLKUP`, the command fails with **IMQ0016** instead of overwriting it.
+- **One mock per name:** stubs and recorded calls are keyed by object name alone, so a job cannot hold two mocks of the same name in two libraries.
 - **Library list:** the mock library must come before the real object's library, just as QTEMP must. `IMOQPGM`, `IMOQBUILD` and `IMOQCHK` check this.
 - **Lifetime:** the mock *object* stays in the library after the job ends, but its stubs and recorded calls live in QTEMP and belong to the job. Run `IMOQRMV` at the end of the driver so no mock is left behind for other jobs to call.
 
@@ -521,7 +530,7 @@ IMOQPGM    OBJ(CUSTLKUP) PARMS((*CHAR 10) (*CHAR 50) (*IND)) LIB(TESTLIB)
 | IMQ0013 | With `SRCFILE(*RTV)` or a binder source member: the real service program or its binder source couldn't be found |
 | IMQ0014 | Invalid layout or value, such as an overflow, a bad indicator, or an undeclared parameter |
 | IMQ0015 | The stub didn't build. The listing is spooled; the source is in `QTEMP/IMOQSRC` |
-| IMQ0016 | The `LIB()` library already holds a real object with the mock's name; iMoq won't replace it |
+| IMQ0016 | The library qualified on `OBJ` already holds a real object with the mock's name; iMoq won't replace it |
 | IMQ0020 / IMQ0021 | `IMOQCHK` finding / summary |
 | IMQ0100 | A strict mock received a call no stub matched |
 | IMQ0101 | Sent by `THROW(*MOCK …)` |
@@ -548,8 +557,8 @@ The mock is identified by `OBJ(name)`. Service program mocks also take `PROC(exp
 
 | Command | Key parameters | Mockito / Moq equivalent |
 |---|---|---|
-| `IMOQPGM` | `OBJ` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` · `LIB(QTEMP\|name)` | `mock(X.class)` / `new Mock<X>(behavior)` |
-| `IMOQSRVPGM` | `OBJ` · `BEHAVIOR` · `SRCFILE(*NONE\|*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` · `SIGNATURE(*GEN\|'text')` · `LIB(QTEMP\|name)` | `mock(X.class)` |
+| `IMOQPGM` | `OBJ(QTEMP\|lib/name)` · `PARMS((type len dec) …)` · `BEHAVIOR(*LOOSE\|*STRICT)` | `mock(X.class)` / `new Mock<X>(behavior)` |
+| `IMOQSRVPGM` | `OBJ(QTEMP\|lib/name)` · `BEHAVIOR` · `SRCFILE(*NONE\|*RTV\|lib/file)` · `SRCMBR(*OBJ\|name)` · `SIGNATURE(*GEN\|'text')` | `mock(X.class)` |
 | `IMOQPROC` | `OBJ` · `PROC` · `RTNTYPE(type len dec)` · `PARMS((type len dec\|passing [passing]) …)` | – |
 | `IMOQBUILD` | `OBJ` | – |
 | `IMOQWHEN` | `OBJ` · `PROC(*PGM\|name)` · `ARGS((n matcher value) …)` · `RETURN(v …)` · `SETPARM((n value) …)` · `THROW(msgid msgf lib data)` · `TIMES(*ALWAYS\|n)` | `when().thenReturn()/thenThrow()` / `Setup().Returns()/Callback()/Throws()` |

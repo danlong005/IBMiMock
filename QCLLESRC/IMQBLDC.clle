@@ -143,7 +143,7 @@
                           *BCAT 'already exists and is not an +
                           iMoq mock, so it will not be replaced. +
                           Create the mock in another library with +
-                          LIB().')
+                          IMOQSRVPGM OBJ(library/name).')
              CHGVAR     VAR(&CLMSGID) VALUE('IMQ0016')
              RTNSUBR
              ENDDO

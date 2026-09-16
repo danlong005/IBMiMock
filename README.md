@@ -40,8 +40,9 @@ IMOQRMV
 - **Works from CL and RPG.** The commands run in CL drivers, and the `IMOQ_H`
   copybook wraps them for RPGUnit (or any RPG) tests.
 - **Mocks in QTEMP or any library.** Mocks go in QTEMP by default, so they
-  disappear with the job. `IMOQPGM` and `IMOQSRVPGM` take `LIB(name)` to create
-  them in another library instead. iMoq never replaces a real object: it only
+  disappear with the job. Qualify the name on `IMOQPGM` or `IMOQSRVPGM` —
+  `OBJ(TESTLIB/CUSTLKUP)` — to create them in another library instead. iMoq
+  never replaces a real object: it only
   touches objects it created (text `iMoq mock`). See
   [Creating mocks in another library](docs/PROGRAMMERS_GUIDE.md#creating-mocks-in-another-library).
 - **Built-in safety checks.** iMoq tells you when a mock would be ignored
